@@ -4,16 +4,8 @@
   "description": "Backend microservicios UAJS Smart Campus",
   "private": true,
   "scripts": {
-    "dev:gateway": "cd gateway && npm run dev",
-    "dev:auth": "cd services/auth-service && npm run dev",
-    "dev:users": "cd services/users-service && npm run dev",
-    "dev:events": "cd services/events-service && npm run dev",
-    "dev:reservations": "cd services/reservations-service && npm run dev",
-    "dev:notifications": "cd services/notifications-service && npm run dev",
-    "dev": "node scripts/dev.js",
-    "install:all": "npm install && cd gateway && npm install && cd ../services/auth-service && npm install && cd ../users-service && npm install && cd ../events-service && npm install && cd ../reservations-service && npm install && cd ../notifications-service && npm install",
-    "docker:up": "docker-compose up --build",
-    "docker:down": "docker-compose down"
+  "dev": "nodemon server.js",
+  "start": "node server.js"
   },
   "keywords": [],
   "author": "",
