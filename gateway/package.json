@@ -1,0 +1,19 @@
+{
+	"name": "gateway",
+	"version": "1.0.0",
+	"description": "API Gateway - UAJS Smart Campus",
+	"main": "src/server.js",
+	"scripts": {
+		"dev": "nodemon src/server.js",
+		"start": "node src/server.js"
+	},
+	"dependencies": {
+		"cors": "^2.8.5",
+		"dotenv": "^16.3.1",
+		"express": "^5.2.1",
+		"http-proxy-middleware": "^3.0.0"
+	},
+	"devDependencies": {
+		"nodemon": "^3.1.14"
+	}
+}

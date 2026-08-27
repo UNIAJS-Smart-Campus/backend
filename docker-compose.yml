@@ -1,0 +1,122 @@
+services:
+	db:
+		image: mysql:8.0
+		environment:
+			MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+			MYSQL_DATABASE: uajs_smart_campus
+		ports:
+			- "3306:3306"
+		volumes:
+			- mysql_data:/var/lib/mysql
+			- ./database/uajs_smart_campus.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+		healthcheck:
+			test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
+			interval: 5s
+			timeout: 5s
+			retries: 20
+
+	gateway:
+		build: ./gateway
+		environment:
+			GATEWAY_PORT: 3000
+			AUTH_SERVICE_URL: http://auth-service:3001
+			USERS_SERVICE_URL: http://users-service:3002
+			EVENTS_SERVICE_URL: http://events-service:3003
+			RESERVATIONS_SERVICE_URL: http://reservations-service:3004
+			NOTIFICATIONS_SERVICE_URL: http://notifications-service:3005
+			REQUESTS_SERVICE_URL: http://requests-service:3006
+			RESOURCES_SERVICE_URL: http://resources-service:3007
+		ports:
+			- "3000:3000"
+		depends_on:
+			- auth-service
+			- users-service
+			- events-service
+			- reservations-service
+			- notifications-service
+			- requests-service
+			- resources-service
+
+	auth-service:
+		build: ./services/auth-service
+		environment: &service-environment
+			DB_HOST: db
+			DB_PORT: 3306
+			DB_USER: root
+			DB_PASSWORD: ""
+			DB_NAME: uajs_smart_campus
+			AUTH_SERVICE_PORT: 3001
+		ports:
+			- "3001:3001"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	users-service:
+		build: ./services/users-service
+		environment:
+			<<: *service-environment
+			USERS_SERVICE_PORT: 3002
+		ports:
+			- "3002:3002"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	events-service:
+		build: ./services/events-service
+		environment:
+			<<: *service-environment
+			EVENTS_SERVICE_PORT: 3003
+		ports:
+			- "3003:3003"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	reservations-service:
+		build: ./services/reservations-service
+		environment:
+			<<: *service-environment
+			RESERVATIONS_SERVICE_PORT: 3004
+		ports:
+			- "3004:3004"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	notifications-service:
+		build: ./services/notifications-service
+		environment:
+			<<: *service-environment
+			NOTIFICATIONS_SERVICE_PORT: 3005
+		ports:
+			- "3005:3005"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	requests-service:
+		build: ./services/requests-service
+		environment:
+			<<: *service-environment
+			REQUESTS_SERVICE_PORT: 3006
+		ports:
+			- "3006:3006"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	resources-service:
+		build: ./services/resources-service
+		environment:
+			<<: *service-environment
+			RESOURCES_SERVICE_PORT: 3007
+		ports:
+			- "3007:3007"
+		depends_on:
+			db:
+				condition: service_healthy
+
+volumes:
+	mysql_data:
