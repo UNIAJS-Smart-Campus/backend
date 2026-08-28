@@ -26,6 +26,9 @@ services:
 			NOTIFICATIONS_SERVICE_URL: http://notifications-service:3005
 			REQUESTS_SERVICE_URL: http://requests-service:3006
 			RESOURCES_SERVICE_URL: http://resources-service:3007
+			PQRS_SERVICE_URL: http://pqrs-service:3008
+			INFO_ACADEMICA_SERVICE_URL: http://info-academica-service:3009
+			CONFIGURACION_SERVICE_URL: http://configuracion-service:3010
 		ports:
 			- "3000:3000"
 		depends_on:
@@ -36,6 +39,9 @@ services:
 			- notifications-service
 			- requests-service
 			- resources-service
+			- pqrs-service
+			- info-academica-service
+			- configuracion-service
 
 	auth-service:
 		build: ./services/auth-service
@@ -92,6 +98,61 @@ services:
 			NOTIFICATIONS_SERVICE_PORT: 3005
 		ports:
 			- "3005:3005"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	requests-service:
+		build: ./services/requests-service
+		environment:
+			<<: *service-environment
+			REQUESTS_SERVICE_PORT: 3006
+		ports:
+			- "3006:3006"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	resources-service:
+		build: ./services/resources-service
+		environment:
+			<<: *service-environment
+			RESOURCES_SERVICE_PORT: 3007
+		ports:
+			- "3007:3007"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	pqrs-service:
+		build: ./services/pqrs-service
+		environment:
+			<<: *service-environment
+			PQRS_SERVICE_PORT: 3008
+		ports:
+			- "3008:3008"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	info-academica-service:
+		build: ./services/info-academica-service
+		environment:
+			<<: *service-environment
+			INFO_ACADEMICA_SERVICE_PORT: 3009
+		ports:
+			- "3009:3009"
+		depends_on:
+			db:
+				condition: service_healthy
+
+	configuracion-service:
+		build: ./services/configuracion-service
+		environment:
+			<<: *service-environment
+			CONFIGURACION_SERVICE_PORT: 3010
+		ports:
+			- "3010:3010"
 		depends_on:
 			db:
 				condition: service_healthy

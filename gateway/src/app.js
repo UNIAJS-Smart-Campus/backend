@@ -1,8 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const routes = require('./config/routes');
 
@@ -30,5 +30,8 @@ app.use('/api/reservations', proxyFor('reservations', '/api/reservations'));
 app.use('/api/notifications', proxyFor('notifications', '/api/notifications'));
 app.use('/api/requests', proxyFor('requests', '/api/requests'));
 app.use('/api/resources', proxyFor('resources', '/api/resources'));
+app.use('/api/pqrs', proxyFor('pqrs', '/api/pqrs'));
+app.use('/api/info-academica', proxyFor('info-academica', '/api/info-academica'));
+app.use('/api/configuracion', proxyFor('configuracion', '/api/configuracion'));
 
 module.exports = app;

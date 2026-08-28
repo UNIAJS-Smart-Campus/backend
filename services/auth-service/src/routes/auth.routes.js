@@ -1,15 +1,9 @@
 const router = require('express').Router();
+const { login, register, me } = require('../controllers/auth.controller');
+const verifyToken = require('../middlewares/auth');
 
-router.post('/login', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
-
-router.post('/register', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
-
-router.get('/me', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
+router.post('/login', login);
+router.post('/register', register);
+router.get('/me', verifyToken, me);
 
 module.exports = router;
