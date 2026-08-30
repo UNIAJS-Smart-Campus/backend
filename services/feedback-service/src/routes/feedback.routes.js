@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { getAll, getOne, create, update, remove } = require('../controllers/pqrs.controller');
+const { getAll, getOne, create, update, remove } = require('../controllers/feedback.controller');
 
 router.get('/', getAll);
 router.get('/:id', getOne);

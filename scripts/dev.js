@@ -10,9 +10,9 @@ const services = [
     { name: 'notifications-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'notifications-service') },
     { name: 'requests-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'requests-service') },
     { name: 'resources-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'resources-service') },
-    { name: 'pqrs-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'pqrs-service') },
-    { name: 'info-academica-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'info-academica-service') },
-    { name: 'configuracion-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'configuracion-service') }
+    { name: 'feedback-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'feedback-service') },
+    { name: 'academic-info-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'academic-info-service') },
+    { name: 'configuration-service', command: 'npm', args: ['run', 'dev'], cwd: path.join(__dirname, '..', 'services', 'configuration-service') }
 ];
 
 services.forEach(service => {

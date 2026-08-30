@@ -1,14 +1,14 @@
-services:
-  info-academica-service:
+﻿services:
+  configuration-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: uajs-info-academica-service
+    container_name: uajs-configuration-service
     restart: unless-stopped
     ports:
-      - "${INFO_ACADEMICA_SERVICE_PORT:-3009}:3009"
+      - "${CONFIGURACION_SERVICE_PORT:-3010}:3010"
     environment:
-      PORT: ${INFO_ACADEMICA_SERVICE_PORT:-3009}
+      PORT: ${CONFIGURACION_SERVICE_PORT:-3010}
       DB_HOST: mysql
       DB_PORT: ${DB_PORT:-3306}
       DB_USER: ${DB_USER:-root}

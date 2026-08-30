@@ -1,7 +1,7 @@
 {
-  "name": "info-academica-service",
+  "name": "configuration-service",
   "version": "1.0.0",
-  "description": "Info Académica Service - UAJS Smart Campus",
+  "description": "Configuration Service - UAJS Smart Campus",
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",

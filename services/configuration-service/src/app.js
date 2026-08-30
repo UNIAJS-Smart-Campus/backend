@@ -9,11 +9,11 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'PQRS Service funcionando correctamente'
+        message: 'Configuration Service funcionando correctamente'
     });
 });
 
-app.use('/api/pqrs', require('./routes/pqrs.routes'));
+app.use('/api/configuration', require('./routes/configuration.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

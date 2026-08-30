@@ -9,11 +9,11 @@ app.use(express.json());
 
 app.get('/', (req, res) => {
     res.json({
-        message: 'Info Académica Service funcionando correctamente'
+        message: 'Feedback Service funcionando correctamente'
     });
 });
 
-app.use('/api/info-academica', require('./routes/info-academica.routes'));
+app.use('/api/feedback', require('./routes/feedback.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

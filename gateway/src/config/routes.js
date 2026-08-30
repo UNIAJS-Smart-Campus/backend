@@ -6,7 +6,7 @@ module.exports = {
     notifications: 'http://notifications-service:3005',
     requests: 'http://requests-service:3006',
     resources: 'http://resources-service:3007',
-    pqrs: 'http://pqrs-service:3008',
-    'info-academica': 'http://info-academica-service:3009',
-    configuracion: 'http://configuracion-service:3010'
+    feedback: 'http://feedback-service:3008',
+    'academic-info': 'http://academic-info-service:3009',
+    configuration: 'http://configuration-service:3010'
 };

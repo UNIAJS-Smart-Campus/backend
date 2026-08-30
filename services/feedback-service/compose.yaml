@@ -1,9 +1,9 @@
 ﻿services:
-  pqrs-service:
+  feedback-service:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: uajs-pqrs-service
+    container_name: uajs-feedback-service
     restart: unless-stopped
     ports:
       - "${PQRS_SERVICE_PORT:-3008}:3008"

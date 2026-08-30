@@ -29,8 +29,8 @@ app.use('/api/reservations', proxyFor('reservations', '/api/reservations'));
 app.use('/api/notifications', proxyFor('notifications', '/api/notifications'));
 app.use('/api/requests', proxyFor('requests', '/api/requests'));
 app.use('/api/resources', proxyFor('resources', '/api/resources'));
-app.use('/api/pqrs', proxyFor('pqrs', '/api/pqrs'));
-app.use('/api/info-academica', proxyFor('info-academica', '/api/info-academica'));
-app.use('/api/configuracion', proxyFor('configuracion', '/api/configuracion'));
+app.use('/api/feedback', proxyFor('feedback', '/api/feedback'));
+app.use('/api/academic-info', proxyFor('academic-info', '/api/academic-info'));
+app.use('/api/configuration', proxyFor('configuration', '/api/configuration'));
 
 module.exports = app;
