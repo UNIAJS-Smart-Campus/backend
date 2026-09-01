@@ -8,5 +8,6 @@ module.exports = {
     resources: 'http://resources-service:3007',
     feedback: 'http://feedback-service:3008',
     'academic-info': 'http://academic-info-service:3009',
-    configuration: 'http://configuration-service:3010'
+    configuration: 'http://configuration-service:3010',
+    search: 'http://search-service:3011'
 };

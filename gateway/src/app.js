@@ -32,5 +32,6 @@ app.use('/api/resources', proxyFor('resources', '/api/resources'));
 app.use('/api/feedback', proxyFor('feedback', '/api/feedback'));
 app.use('/api/academic-info', proxyFor('academic-info', '/api/academic-info'));
 app.use('/api/configuration', proxyFor('configuration', '/api/configuration'));
+app.use('/api/search', proxyFor('search', '/api/search'));
 
 module.exports = app;
