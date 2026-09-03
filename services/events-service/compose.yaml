@@ -1,0 +1,27 @@
+services:
+  events-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uajs-events-service
+    restart: unless-stopped
+    ports:
+      - "${EVENTS_SERVICE_PORT:-3003}:3003"
+    environment:
+      PORT: ${EVENTS_SERVICE_PORT:-3003}
+      DB_HOST: mysql
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-uajs_smart_campus}
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-3001}
+      USERS_SERVICE_PORT: ${USERS_SERVICE_PORT:-3002}
+    env_file:
+      - ../../../.env
+    networks:
+      - smart-campus-network
+
+networks:
+  smart-campus-network:
+    name: smart-campus-network
+    external: true

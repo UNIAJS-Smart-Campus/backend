@@ -1,19 +1,10 @@
 const router = require('express').Router();
+const { getAll, getOne, create, update, remove } = require('../controllers/reservations.controller');
 
-router.get('/', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
-
-router.post('/', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
-
-router.put('/:id', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
-
-router.delete('/:id', (req, res) => {
-    res.status(501).json({ error: 'No implementado aún' });
-});
+router.get('/', getAll);
+router.get('/:id', getOne);
+router.post('/', create);
+router.put('/:id', update);
+router.delete('/:id', remove);
 
 module.exports = router;
