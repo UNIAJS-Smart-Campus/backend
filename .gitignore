@@ -1,32 +1,88 @@
+# ============================================================
+# DEPENDENCIAS
+# ============================================================
 node_modules/
+**/node_modules/
 
-# Variables de entorno locales
+# ============================================================
+# VARIABLES DE ENTORNO LOCALES
+# ============================================================
 .env
 .env.local
 .env.*.local
+!.env.example
 
-# Logs de npm y herramientas
+# ============================================================
+# LOGS DE NPM Y HERRAMIENTAS
+# ============================================================
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Salidas de compilacion y pruebas
+# ============================================================
+# SALIDAS DE COMPILACION Y PRUEBAS
+# ============================================================
 dist/
 dist-ssr/
 build/
 coverage/
+*.tsbuildinfo
+.vite/
+.next/
 
-# Archivos temporales
+# ============================================================
+# CACHE
+# ============================================================
+.cache/
+.parcel-cache/
+.temp/
+.eslintcache
+
+# ============================================================
+# BASE DE DATOS / ARCHIVOS GENERADOS
+# ============================================================
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+backend/prisma/*.db
+backend/prisma/*.db-journal
+
+# ============================================================
+# ARCHIVOS TEMPORALES
+# ============================================================
 *.tmp
 *.temp
+*.bak
+*.orig
+*~
 
-# Sistema operativo
+# ============================================================
+# SISTEMA OPERATIVO
+# ============================================================
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Editores
+# ============================================================
+# EDITORES
+# ============================================================
 .vscode/
 .idea/
+*.swp
+*.swo
+.project
+.settings/
+.classpath
+
+# ============================================================
+# DOCKER
+# ============================================================
+docker-compose.override.yml
+docker-compose.override.yaml
+*.override.yaml
+*.override.yml
