@@ -1,0 +1,13 @@
+{
+  "name": "backend-uajs-smart-campus",
+  "version": "0.2.0",
+  "description": "Backend microservicios UAJS Smart Campus",
+  "private": true,
+  "scripts": {
+  "dev": "nodemon server.js",
+  "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

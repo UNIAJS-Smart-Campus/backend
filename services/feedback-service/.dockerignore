@@ -1,0 +1,51 @@
+# Dependencias
+node_modules
+**/node_modules
+
+# Git
+.git
+.gitignore
+.github
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+*.local
+
+# Build / Cache
+dist
+build
+coverage
+.cache
+.temp
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+
+# Editor / IDE
+.vscode
+.idea
+*.suo
+*.sln
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*~
+
+# Comprimidos
+*.zip
+*.tar
+*.gz
+
+# Documentacion
+README.md

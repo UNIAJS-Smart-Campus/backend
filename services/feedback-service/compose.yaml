@@ -1,0 +1,25 @@
+services:
+  feedback-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uajs-feedback-service
+    restart: unless-stopped
+    ports:
+      - "${PQRS_SERVICE_PORT:-3008}:3008"
+    environment:
+      PORT: ${PQRS_SERVICE_PORT:-3008}
+      DB_HOST: mysql
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-uajs_smart_campus}
+    env_file:
+      - ../../../.env
+    networks:
+      - smart-campus-network
+
+networks:
+  smart-campus-network:
+    name: smart-campus-network
+    external: true

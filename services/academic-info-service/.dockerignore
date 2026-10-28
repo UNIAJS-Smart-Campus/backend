@@ -1,0 +1,56 @@
+# Dependencias
+node_modules
+**/node_modules
+
+# Git
+.git
+.gitignore
+.dockerignore
+.github
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+*.local
+
+# Build / Cache
+dist
+build
+coverage
+.cache
+.temp
+*.tsbuildinfo
+.next
+
+# Logs
+logs
+*.log
+
+# Editor / IDE
+.vscode
+.idea
+*.suo
+*.sln
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*~
+
+# Comprimidos
+*.zip
+*.tar
+*.gz
+
+# Documentacion / Config local
+README.md
+compose.y*ml
+docker-compose*
+Dockerfile*
