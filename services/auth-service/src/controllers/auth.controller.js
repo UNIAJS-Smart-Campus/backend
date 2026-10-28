@@ -1,5 +1,6 @@
 const pool = require('../config/database');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'uajs_secret_key_2026';
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '24h';
@@ -12,8 +13,8 @@ async function login(req, res, next) {
         }
 
         const [rows] = await pool.query(
-            'SELECT id_usuario, nombre, apellido, correo, id_rol, tipo_usuario, contraseña, estado FROM usuarios WHERE identificacion = ? AND estado = ?',
-            [identificacion, 'Activo']
+            'SELECT id_usuario, nombre, apellido, correo, id_rol, tipo_usuario, contraseña, estado FROM usuarios WHERE (identificacion = ? OR usuario = ? OR cedula = ?) AND estado = ?',
+            [identificacion, identificacion, identificacion, 'Activo']
         );
 
         const user = rows[0];
@@ -21,7 +22,13 @@ async function login(req, res, next) {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
-        if (user.contraseña !== password) {
+        let isValid = false;
+        if (user.contraseña.startsWith('$2a$') || user.contraseña.startsWith('$2b$') || user.contraseña.startsWith('$2y$')) {
+            isValid = await bcrypt.compare(password, user.contraseña);
+        } else {
+            isValid = user.contraseña === password;
+        }
+        if (!isValid) {
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 

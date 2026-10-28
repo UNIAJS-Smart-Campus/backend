@@ -13,6 +13,10 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'pqrs-service', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/pqrs', require('./routes/pqrs.routes'));
 
 app.use(require('./middlewares/errorHandler'));

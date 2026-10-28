@@ -15,6 +15,10 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'notifications-service', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/notifications', require('./routes/notifications.routes'));
 
 app.use(require('./middlewares/errorHandler'));

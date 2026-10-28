@@ -14,6 +14,10 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'reservations-service', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/reservations', require('./routes/reservations.routes'));
 
 app.use(require('./middlewares/errorHandler'));

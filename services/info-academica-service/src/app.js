@@ -13,6 +13,10 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'info-academica-service', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/info-academica', require('./routes/info-academica.routes'));
 
 app.use(require('./middlewares/errorHandler'));

@@ -14,6 +14,10 @@ app.get('/', (req, res) => {
     });
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'auth-service', timestamp: new Date().toISOString() });
+});
+
 app.use('/api/auth', require('./routes/auth.routes'));
 
 app.use(require('./middlewares/errorHandler'));
