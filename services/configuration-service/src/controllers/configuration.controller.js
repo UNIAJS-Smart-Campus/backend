@@ -66,13 +66,24 @@ async function update(req, res, next) {
     try {
         const { id } = req.params;
         const { id_usuario, seccion, valor } = req.body;
-        const [result] = await pool.query(
-            'UPDATE configuracion SET id_usuario = ?, seccion = ?, valor = ? WHERE id_config = ?',
-            [id_usuario, seccion, JSON.stringify(valor), id]
-        );
-        if (result.affectedRows === 0) {
+
+        // Actualización parcial: se parte de la fila actual para no enviar
+        // `undefined` a mysql2 (que falla con "Bind parameters must not
+        // contain undefined"). Solo se escribe lo que llega en el body.
+        const [rows] = await pool.query('SELECT * FROM configuracion WHERE id_config = ?', [id]);
+        if (!rows.length) {
             return res.status(404).json({ error: 'Configuración no encontrada' });
         }
+        const actual = rows[0];
+
+        const nuevoUsuario = id_usuario ?? actual.id_usuario;
+        const nuevaSeccion = seccion ?? actual.seccion;
+        const nuevoValor = valor === undefined ? actual.valor : JSON.stringify(valor);
+
+        await pool.query(
+            'UPDATE configuracion SET id_usuario = ?, seccion = ?, valor = ? WHERE id_config = ?',
+            [nuevoUsuario, nuevaSeccion, nuevoValor, id]
+        );
         const [updated] = await pool.query('SELECT * FROM configuracion WHERE id_config = ?', [id]);
         res.json({ data: updated[0] });
     } catch (error) {

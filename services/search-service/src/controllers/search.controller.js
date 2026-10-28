@@ -4,8 +4,8 @@ const SEARCHABLE_FIELDS = {
     [INDICATORS.USUARIOS]: ['nombre', 'apellido', 'nombre_completo', 'correo', 'programa', 'identificacion', 'nombre_rol'],
     [INDICATORS.RECURSOS]: ['nombre_recurso', 'codigo', 'descripcion', 'ubicacion', 'tipo_recurso'],
     [INDICATORS.EVENTOS]: ['nombre_evento', 'descripcion', 'ubicacion', 'tipo_evento'],
-    [INDICATORS.SOLICITUDES]: ['codigo', 'tipo', 'descripcion', 'solicitante', 'respuesta'],
-    [INDICATORS.PQRS]: ['id_pqrs', 'tipo', 'descripcion'],
+    [INDICATORS.SOLICITUDES]: ['codigo', 'tipo', 'descripcion', 'solicitante', 'dependencia', 'respuesta'],
+    [INDICATORS.PQRS]: ['tipo', 'asunto', 'descripcion', 'solicitante', 'area', 'respuesta'],
     [INDICATORS.INFO_ACADEMICA]: ['titulo', 'contenido', 'autor', 'categoria']
 };
 

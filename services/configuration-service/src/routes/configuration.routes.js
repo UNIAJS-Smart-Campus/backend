@@ -1,5 +1,8 @@
 const router = require('express').Router();
+const requireActor = require('../middlewares/actor');
 const { getAll, getOne, getByUserAndSection, create, update, remove } = require('../controllers/configuration.controller');
+
+router.use(requireActor);
 
 router.get('/', getAll);
 router.get('/:id', getOne);

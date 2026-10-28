@@ -75,7 +75,7 @@ CREATE TABLE `eventos_y_actividades` (
   `hora_inicio` time NOT NULL,
   `hora_fin` time NOT NULL,
   `ubicacion` varchar(120) NOT NULL,
-  `tipo_evento` enum('Académico','Cultural','Deportivo','Formación') NOT NULL,
+  `tipo_evento` enum('Académico','Cultural','Deportivo','Formación','Institucional') NOT NULL,
   `estado` varchar(30) NOT NULL DEFAULT 'Programado',
   `id_usuario` int DEFAULT NULL,
   `cupo` int DEFAULT '0',

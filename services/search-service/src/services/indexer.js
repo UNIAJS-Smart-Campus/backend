@@ -75,6 +75,8 @@ const INDEX_MAPPINGS = {
                 tipo: { type: 'keyword' },
                 descripcion: { type: 'text', analyzer: 'spanish_analyzer' },
                 solicitante: { type: 'text', analyzer: 'spanish_analyzer' },
+                dependencia: { type: 'text', analyzer: 'spanish_analyzer' },
+                prioridad: { type: 'keyword' },
                 estado: { type: 'keyword' },
                 respuesta: { type: 'text', analyzer: 'spanish_analyzer' },
                 fecha_solicitud: { type: 'date' }
@@ -86,8 +88,13 @@ const INDEX_MAPPINGS = {
             properties: {
                 id_pqrs: { type: 'keyword' },
                 tipo: { type: 'keyword' },
+                asunto: { type: 'text', analyzer: 'spanish_analyzer' },
                 descripcion: { type: 'text', analyzer: 'spanish_analyzer' },
+                solicitante: { type: 'text', analyzer: 'spanish_analyzer' },
+                area: { type: 'keyword' },
+                prioridad: { type: 'keyword' },
                 estado: { type: 'keyword' },
+                respuesta: { type: 'text', analyzer: 'spanish_analyzer' },
                 fecha: { type: 'date' }
             }
         }
@@ -107,20 +114,28 @@ const INDEX_MAPPINGS = {
 };
 
 async function createIndex(indexName) {
-    const exists = await client.indices.exists({ index: indexName });
-    if (exists) {
+    const existe = await client.indices.exists({ index: indexName });
+    if (existe) {
         await client.indices.delete({ index: indexName });
     }
     await client.indices.create({
         index: indexName,
-        ...INDEX_MAPPINGS[indexName]
+        ...INDEX_MAPPINGS[indexName],
+        settings: {
+            // Un solo nodo en desarrollo: sin réplicas el índice queda green.
+            number_of_replicas: 0,
+            ...(INDEX_MAPPINGS[indexName].settings || {})
+        }
     });
     console.log(`Índice ${indexName} creado correctamente`);
 }
 
 async function indexUsuarios() {
+    // Se excluyen credenciales y tokens: nunca deben viajar al índice.
     const [rows] = await pool.query(`
-        SELECT u.*, r.nombre_rol
+        SELECT u.id_usuario, u.identificacion, u.usuario, u.nombre, u.apellido,
+               u.correo, u.telefono, u.id_rol, u.tipo_usuario, u.programa,
+               u.cargo, u.campus, u.estado, r.nombre_rol
         FROM usuarios u
         LEFT JOIN roles r ON u.id_rol = r.id_rol
     `);
@@ -176,7 +191,7 @@ async function indexSolicitudes() {
 async function indexPQRS() {
     const [rows] = await pool.query('SELECT * FROM pqrs');
     const operations = rows.flatMap(doc => [
-        { index: { _index: INDICATORS.PQRS, _id: doc.id_pqrs } },
+        { index: { _index: INDICATORS.PQRS, _id: String(doc.id_pqrs) } },
         doc
     ]);
     if (operations.length > 0) {
@@ -197,7 +212,7 @@ async function indexInfoAcademica() {
     console.log(`${rows.length} publicaciones académicas indexadas`);
 }
 
-async function run() {
+async function run({ close = true } = {}) {
     console.log('Iniciando indexación...');
     try {
         for (const indexName of Object.values(INDICATORS)) {
@@ -210,12 +225,19 @@ async function run() {
         await indexPQRS();
         await indexInfoAcademica();
         console.log('Indexación completada exitosamente');
+        return true;
     } catch (error) {
-        console.error('Error en indexación:', error);
-        process.exit(1);
+        console.error('Error en indexación:', error.message);
+        if (close) {
+            process.exitCode = 1;
+            throw error;
+        }
+        return false;
     } finally {
-        await pool.end();
-        await client.close();
+        if (close) {
+            await pool.end();
+            await client.close();
+        }
     }
 }
 

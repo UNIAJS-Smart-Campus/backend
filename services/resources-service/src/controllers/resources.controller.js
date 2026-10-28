@@ -42,14 +42,27 @@ async function create(req, res, next) {
 async function update(req, res, next) {
     try {
         const { id } = req.params;
-        const { nombre_recurso, codigo, tipo_recurso, descripcion, ubicacion, capacidad, estado, disponibilidad } = req.body;
-        const [result] = await pool.query(
-            'UPDATE recursos SET nombre_recurso = ?, codigo = ?, tipo_recurso = ?, descripcion = ?, ubicacion = ?, capacidad = ?, estado = ?, disponibilidad = ? WHERE id_recurso = ?',
-            [nombre_recurso, codigo, tipo_recurso, descripcion, ubicacion, capacidad, estado, disponibilidad, id]
-        );
-        if (result.affectedRows === 0) {
+        const [rows] = await pool.query('SELECT * FROM recursos WHERE id_recurso = ?', [id]);
+        if (!rows.length) {
             return res.status(404).json({ error: 'Recurso no encontrado' });
         }
+        const actual = rows[0];
+        const b = req.body;
+
+        await pool.query(
+            'UPDATE recursos SET nombre_recurso = ?, codigo = ?, tipo_recurso = ?, descripcion = ?, ubicacion = ?, capacidad = ?, estado = ?, disponibilidad = ? WHERE id_recurso = ?',
+            [
+                b.nombre_recurso ?? actual.nombre_recurso,
+                b.codigo ?? actual.codigo,
+                b.tipo_recurso ?? actual.tipo_recurso,
+                b.descripcion ?? actual.descripcion,
+                b.ubicacion ?? actual.ubicacion,
+                b.capacidad ?? actual.capacidad,
+                b.estado ?? actual.estado,
+                b.disponibilidad ?? actual.disponibilidad,
+                id
+            ]
+        );
         const [updated] = await pool.query('SELECT * FROM recursos WHERE id_recurso = ?', [id]);
         res.json({ data: updated[0] });
     } catch (error) {
