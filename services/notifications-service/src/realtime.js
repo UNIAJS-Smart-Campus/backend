@@ -9,11 +9,8 @@ function roomForUser(idUsuario) {
     return `user:${idUsuario}`;
 }
 
-function esRolAdministrativo(actor = {}) {
-    const rol = String(actor.rol ?? '');
-    const tipo = String(actor.tipo_usuario ?? '');
-    return ['1', '4', 'administrador', 'administrativo', 'funcionario'].includes(rol.toLowerCase())
-        || ['administrador', 'administrativo', 'funcionario'].includes(tipo.toLowerCase());
+function esRolAdministrativo(rol) {
+    return rol === 'Administrador' || rol === 'Administrativo' || rol === 'Funcionario';
 }
 
 /**
@@ -57,16 +54,10 @@ function initRealtime(httpServer) {
     });
 
     io.on('connection', (socket) => {
-        const actor = socket.data.actor || {};
-        const id = actor.id;
-
-        if (!id) {
-            socket.disconnect(true);
-            return;
-        }
+        const { id, tipo_usuario } = socket.data.actor;
 
         socket.join(roomForUser(id));
-        if (esRolAdministrativo(actor)) {
+        if (esRolAdministrativo(tipo_usuario)) {
             socket.join('admins');
         }
     });

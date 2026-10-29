@@ -1,17 +1,15 @@
 const router = require('express').Router();
-const requireActor = require('../middlewares/actor');
-const requireAdmin = require('../middlewares/admin');
-const { getAll, getOne, create, update, remove, register, unregister } = require('../controllers/events.controller');
-
-router.use(requireActor);
+const {
+    getAll, getOne, create, update, remove, listarInscripciones, inscribir, desinscribir
+} = require('../controllers/events.controller');
 
 router.get('/', getAll);
 router.get('/:id', getOne);
-router.post('/', requireAdmin, create);
-router.put('/:id', requireAdmin, update);
-router.delete('/:id', requireAdmin, remove);
-
-router.post('/:id/register', register);
-router.delete('/:id/register', unregister);
+router.post('/', create);
+router.put('/:id', update);
+router.delete('/:id', remove);
+router.get('/:id/inscripciones', listarInscripciones);
+router.post('/:id/inscripciones', inscribir);
+router.delete('/:id/inscripciones/:idUsuario', desinscribir);
 
 module.exports = router;

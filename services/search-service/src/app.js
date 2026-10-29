@@ -15,10 +15,6 @@ app.get('/', (req, res) => {
     });
 });
 
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', service: 'search-service', timestamp: new Date().toISOString() });
-});
-
 app.use('/api/search', require('./routes/search.routes'));
 
 app.use((err, req, res, next) => {

@@ -3,15 +3,12 @@
 # ============================================================
 node_modules/
 **/node_modules/
-.jedis/
 
 # ============================================================
-# VARIABLES DE ENTORNO
+# VARIABLES DE ENTORNO LOCALES
 # ============================================================
 .env
 .env.*
-*.local
-# la plantilla .env.example SIEMPRE se versiona
 !.env.example
 
 # ============================================================
@@ -43,46 +40,31 @@ coverage/
 .parcel-cache/
 .temp/
 .eslintcache
-.stylelintcache
 
 # ============================================================
 # BASE DE DATOS / ARCHIVOS GENERADOS
 # ============================================================
-# (los .sql versionados: uajs_smart_campus.sql y database/migrations/
-#  NO se ignoran a proposito; son el esquema del proyecto)
 *.sqlite
 *.sqlite3
-*.sqlite-wal
-*.sqlite-shm
 *.db
-*.db-journal
 *.dump
+backend/prisma/*.db
+backend/prisma/*.db-journal
 
 # ============================================================
-# DOCUMENTACION DE TRABAJO
-# ============================================================
-docs/*.tmp
-*.md.tmp
-LOGINS_USUARIOS.md
-
-# ============================================================
-# ARCHIVOS TEMPORALES / COMPRIMIDOS
+# ARCHIVOS TEMPORALES
 # ============================================================
 *.tmp
 *.temp
 *.bak
 *.orig
 *~
-*.zip
-*.rar
-*.7z
 
 # ============================================================
 # SISTEMA OPERATIVO
 # ============================================================
 .DS_Store
 Thumbs.db
-ehthumbs.db
 Desktop.ini
 
 # ============================================================
@@ -95,13 +77,11 @@ Desktop.ini
 .project
 .settings/
 .classpath
-*.code-workspace
 
 # ============================================================
 # DOCKER
 # ============================================================
 docker-compose.override.yml
-docker-compose.override.prod.yml
 docker-compose.override.yaml
 *.override.yaml
 *.override.yml
