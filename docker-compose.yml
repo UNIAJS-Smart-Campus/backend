@@ -1,0 +1,501 @@
+services:
+
+  # =========================================================
+  # MYSQL
+  # =========================================================
+  mysql:
+    image: mysql:8.0
+    container_name: uajs-mysql
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: uajs_smart_campus
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./uajs_smart_campus.sql:/docker-entrypoint-initdb.d/uajs_smart_campus.sql:ro
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
+  # =========================================================
+  # ELASTICSEARCH
+  # =========================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    container_name: uajs-elasticsearch
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+
+    ports:
+      - "9200:9200"
+
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+
+  # =========================================================
+  # SEARCH SERVICE
+  # =========================================================
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-search-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+      SEARCH_SERVICE_PORT: 3011
+      PORT: 3011
+
+    expose:
+      - "3011"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+
+  # =========================================================
+  # API GATEWAY
+  # =========================================================
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+
+    container_name: uajs-gateway
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3000
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # AUTH SERVICE
+  # =========================================================
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-auth-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3001
+
+    expose:
+      - "3001"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # USERS SERVICE
+  # =========================================================
+  users-service:
+    build:
+      context: ./services/users-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-users-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3002
+
+    expose:
+      - "3002"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # EVENTS SERVICE
+  # =========================================================
+  events-service:
+    build:
+      context: ./services/events-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-events-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3003
+
+    expose:
+      - "3003"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # RESERVATIONS SERVICE
+  # =========================================================
+  reservations-service:
+    build:
+      context: ./services/reservations-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-reservations-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3004
+
+    expose:
+      - "3004"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # NOTIFICATIONS SERVICE
+  # =========================================================
+  notifications-service:
+    build:
+      context: ./services/notifications-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-notifications-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3005
+
+    expose:
+      - "3005"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # REQUESTS SERVICE
+  # =========================================================
+  requests-service:
+    build:
+      context: ./services/requests-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-requests-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3006
+
+    expose:
+      - "3006"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # RESOURCES SERVICE
+  # =========================================================
+  resources-service:
+    build:
+      context: ./services/resources-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-resources-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3007
+
+    expose:
+      - "3007"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # FEEDBACK SERVICE
+  # =========================================================
+  feedback-service:
+    build:
+      context: ./services/feedback-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-feedback-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3008
+
+    expose:
+      - "3008"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # ACADEMIC INFO SERVICE
+  # =========================================================
+  academic-info-service:
+    build:
+      context: ./services/academic-info-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-academic-info-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3009
+
+    expose:
+      - "3009"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # CONFIGURATION SERVICE
+  # =========================================================
+  configuration-service:
+    build:
+      context: ./services/configuration-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-configuration-service
+
+    networks:
+      - smart-campus-network
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3010
+
+    expose:
+      - "3010"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+# =========================================================
+# FRONTEND
+# =========================================================
+# El frontend vive ahora en su propio repositorio:
+#   github.com/NatalyGil/UAJS-Smart-Campus-frontend
+# Se ejecuta fuera de este compose con:  npm install && npm run dev
+# (usa VITE_API_URL=http://localhost:3000 para apuntar a este gateway)
+# =========================================================
+
+# =========================================================
+# REDES
+# =========================================================
+# Red compartida con los compose.yaml individuales de cada servicio.
+# El nombre fijo evita el prefijo del proyecto y permite que esos
+# archivos la declaren como external: true.
+# =========================================================
+networks:
+  smart-campus-network:
+    name: smart-campus-network
+
+# =========================================================
+# VOLUMES
+# =========================================================
+volumes:
+  mysql_data:
+  elasticsearch_data:
