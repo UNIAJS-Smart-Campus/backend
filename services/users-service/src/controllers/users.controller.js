@@ -1,32 +1,12 @@
 const pool = require('../config/database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
-const BCRYPT_ROUNDS = 10;
-
-// Fuente de verdad de roles: tabla `roles`.
-const ROLES_DB = {
-    1: 'Administrador',
-    2: 'Estudiante',
-    3: 'Docente',
-    4: 'Administrativo'
-};
-
-const CAMPOS_PUBLICOS = 'id_usuario, identificacion, usuario, nombre, apellido, correo, telefono, id_rol, tipo_usuario, programa, cargo, campus, estado';
-
-function rolValido(idRol, tipoUsuario) {
-    const id = Number(idRol);
-    if (ROLES_DB[id]) {
-        return { id, tipo: ROLES_DB[id] };
-    }
-    // Si llega un rol inexistente se conserva el tipo recibido solo si es válido.
-    const tipo = Object.values(ROLES_DB).includes(tipoUsuario) ? tipoUsuario : 'Estudiante';
-    const idDerivado = Number(Object.keys(ROLES_DB).find((key) => ROLES_DB[key] === tipo)) || 2;
-    return { id: idDerivado, tipo };
-}
+const CAMPOS = 'id_usuario, identificacion, usuario, cedula, nombre, apellido, correo, telefono, id_rol, tipo_usuario, programa, cargo, campus, foto_perfil, estado';
+const SALT_ROUNDS = 10;
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query(`SELECT ${CAMPOS_PUBLICOS} FROM usuarios ORDER BY id_usuario ASC`);
+        const [rows] = await pool.query(`SELECT ${CAMPOS} FROM usuarios`);
         res.json({ data: rows });
     } catch (error) {
         next(error);
@@ -36,7 +16,7 @@ async function getAll(req, res, next) {
 async function getOne(req, res, next) {
     try {
         const { id } = req.params;
-        const [rows] = await pool.query(`SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE id_usuario = ?`, [id]);
+        const [rows] = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`, [id]);
         if (!rows.length) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
@@ -48,27 +28,51 @@ async function getOne(req, res, next) {
 
 async function create(req, res, next) {
     try {
-        const { nombre, apellido, correo, usuario, password, telefono, id_rol, tipo_usuario, programa, cargo, campus, identificacion } = req.body;
-        if (!nombre || !apellido || !correo || !usuario || !password) {
+        const {
+            nombre, apellido, correo, usuario, password, cedula,
+            telefono, id_rol, tipo_usuario, programa, cargo, campus, identificacion, foto_perfil
+        } = req.body;
+
+        if (!nombre || !correo || !usuario || !password) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
-        if (String(password).length < 6) {
-            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+
+        const [existente] = await pool.query(
+            'SELECT id_usuario FROM usuarios WHERE identificacion = ? OR correo = ? LIMIT 1',
+            [identificacion || usuario, correo]
+        );
+        if (existente.length) {
+            return res.status(409).json({ error: 'El usuario o el correo ya están registrados' });
         }
 
-        const rol = rolValido(id_rol, tipo_usuario);
-        const hash = await bcrypt.hash(String(password), BCRYPT_ROUNDS);
+        const hash = await bcrypt.hash(password, SALT_ROUNDS);
 
         const [result] = await pool.query(
-            'INSERT INTO usuarios (nombre, apellido, correo, usuario, contraseña, telefono, id_rol, tipo_usuario, programa, cargo, campus, estado, identificacion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [nombre, apellido, correo, usuario, hash, telefono || '', rol.id, rol.tipo, programa || '', cargo || '', campus || 'Campus principal', 'Activo', identificacion || usuario]
+            `INSERT INTO usuarios
+                (identificacion, usuario, cedula, contraseña, nombre, apellido, correo,
+                 telefono, id_rol, tipo_usuario, programa, cargo, campus, foto_perfil, estado)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Activo')`,
+            [
+                identificacion || usuario,
+                usuario,
+                cedula || null,
+                hash,
+                nombre,
+                apellido || '',
+                correo,
+                telefono || '',
+                id_rol || 2,
+                tipo_usuario || 'Estudiante',
+                programa || '',
+                cargo || '',
+                campus || 'Campus principal',
+                foto_perfil || null
+            ]
         );
-        const [newUser] = await pool.query(`SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE id_usuario = ?`, [result.insertId]);
+
+        const [newUser] = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`, [result.insertId]);
         res.status(201).json({ data: newUser[0] });
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ error: 'El usuario, la identificación o el correo ya están registrados' });
-        }
         next(error);
     }
 }
@@ -76,49 +80,46 @@ async function create(req, res, next) {
 async function update(req, res, next) {
     try {
         const { id } = req.params;
-        const { nombre, apellido, correo, usuario, password, telefono, id_rol, tipo_usuario, programa, cargo, campus, estado, identificacion } = req.body;
+        const {
+            nombre, apellido, correo, usuario, cedula, password,
+            telefono, id_rol, tipo_usuario, programa, cargo, campus, estado, foto_perfil
+        } = req.body;
 
-        const [actualRows] = await pool.query('SELECT * FROM usuarios WHERE id_usuario = ?', [id]);
-        if (!actualRows.length) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
+        if (!nombre || !correo || !usuario) {
+            return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
-        const actual = actualRows[0];
-        const rol = rolValido(id_rol ?? actual.id_rol, tipo_usuario ?? actual.tipo_usuario);
 
-        let hash = actual.contraseña;
+        // La contraseña solo se sobrescribe si se envía una nueva.
+        const campos = [
+            'nombre = ?', 'apellido = ?', 'correo = ?', 'usuario = ?', 'cedula = ?',
+            'telefono = ?', 'id_rol = ?', 'tipo_usuario = ?', 'programa = ?',
+            'cargo = ?', 'campus = ?', 'foto_perfil = ?', 'estado = ?'
+        ];
+        const valores = [
+            nombre, apellido || '', correo, usuario, cedula || null,
+            telefono || '', id_rol || 2, tipo_usuario || 'Estudiante', programa || '',
+            cargo || '', campus || 'Campus principal', foto_perfil || null, estado || 'Activo'
+        ];
+
         if (password) {
-            if (String(password).length < 6) {
-                return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
-            }
-            hash = await bcrypt.hash(String(password), BCRYPT_ROUNDS);
+            campos.push('contraseña = ?');
+            valores.push(await bcrypt.hash(password, SALT_ROUNDS));
         }
 
-        await pool.query(
-            'UPDATE usuarios SET nombre = ?, apellido = ?, correo = ?, usuario = ?, identificacion = ?, contraseña = ?, telefono = ?, id_rol = ?, tipo_usuario = ?, programa = ?, cargo = ?, campus = ?, estado = ? WHERE id_usuario = ?',
-            [
-                nombre ?? actual.nombre,
-                apellido ?? actual.apellido,
-                correo ?? actual.correo,
-                usuario ?? actual.usuario,
-                identificacion ?? actual.identificacion,
-                hash,
-                telefono ?? actual.telefono,
-                rol.id,
-                rol.tipo,
-                programa ?? actual.programa,
-                cargo ?? actual.cargo,
-                campus ?? actual.campus,
-                estado ?? actual.estado,
-                id
-            ]
+        valores.push(id);
+
+        const [result] = await pool.query(
+            `UPDATE usuarios SET ${campos.join(', ')} WHERE id_usuario = ?`,
+            valores
         );
 
-        const [updated] = await pool.query(`SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE id_usuario = ?`, [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+
+        const [updated] = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`, [id]);
         res.json({ data: updated[0] });
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ error: 'El usuario, la identificación o el correo ya están registrados' });
-        }
         next(error);
     }
 }
@@ -126,7 +127,10 @@ async function update(req, res, next) {
 async function remove(req, res, next) {
     try {
         const { id } = req.params;
-        const [result] = await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['Inactivo', id]);
+        const [result] = await pool.query(
+            'UPDATE usuarios SET estado = ? WHERE id_usuario = ?',
+            ['Inactivo', id]
+        );
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }

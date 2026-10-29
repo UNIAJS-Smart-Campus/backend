@@ -13,10 +13,6 @@ app.get('/', (req, res) => {
     });
 });
 
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', service: 'configuration-service', timestamp: new Date().toISOString() });
-});
-
 app.use('/api/configuration', require('./routes/configuration.routes'));
 
 app.use(require('./middlewares/errorHandler'));

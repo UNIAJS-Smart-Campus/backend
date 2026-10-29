@@ -1,25 +1,29 @@
 const pool = require('../config/database');
 const { client, INDICATORS } = require('../config/elasticsearch');
 
-const INDEX_MAPPINGS = {
-    [INDICATORS.USUARIOS]: {
-        settings: {
-            analysis: {
-                analyzer: {
-                    spanish_analyzer: {
-                        type: 'custom',
-                        tokenizer: 'standard',
-                        filter: ['lowercase', 'asciifolding', 'spanish_stop']
-                    }
-                },
-                filter: {
-                    spanish_stop: {
-                        type: 'stop',
-                        stopwords: '_spanish_'
-                    }
-                }
+// Analizador español: debe declararse en CADA índice, porque los mappings
+// de abajo lo referencian y Elasticsearch no lo hereda entre índices.
+const ANALYSIS = {
+    analysis: {
+        analyzer: {
+            spanish_analyzer: {
+                type: 'custom',
+                tokenizer: 'standard',
+                filter: ['lowercase', 'asciifolding', 'spanish_stop']
             }
         },
+        filter: {
+            spanish_stop: {
+                type: 'stop',
+                stopwords: '_spanish_'
+            }
+        }
+    }
+};
+
+const INDEX_MAPPINGS = {
+    [INDICATORS.USUARIOS]: {
+        settings: ANALYSIS,
         mappings: {
             properties: {
                 id_usuario: { type: 'integer' },
@@ -75,8 +79,6 @@ const INDEX_MAPPINGS = {
                 tipo: { type: 'keyword' },
                 descripcion: { type: 'text', analyzer: 'spanish_analyzer' },
                 solicitante: { type: 'text', analyzer: 'spanish_analyzer' },
-                dependencia: { type: 'text', analyzer: 'spanish_analyzer' },
-                prioridad: { type: 'keyword' },
                 estado: { type: 'keyword' },
                 respuesta: { type: 'text', analyzer: 'spanish_analyzer' },
                 fecha_solicitud: { type: 'date' }
@@ -88,13 +90,17 @@ const INDEX_MAPPINGS = {
             properties: {
                 id_pqrs: { type: 'keyword' },
                 tipo: { type: 'keyword' },
-                asunto: { type: 'text', analyzer: 'spanish_analyzer' },
                 descripcion: { type: 'text', analyzer: 'spanish_analyzer' },
-                solicitante: { type: 'text', analyzer: 'spanish_analyzer' },
-                area: { type: 'keyword' },
+                // Campos de radicación añadidos al esquema.
+                asunto: { type: 'text', analyzer: 'spanish_analyzer' },
+                area: { type: 'text', analyzer: 'spanish_analyzer' },
+                nombre: { type: 'text', analyzer: 'spanish_analyzer' },
+                identificacion: { type: 'keyword' },
                 prioridad: { type: 'keyword' },
+                sede: { type: 'keyword' },
+                tipo_perfil: { type: 'keyword' },
+                asignado_a: { type: 'text', analyzer: 'spanish_analyzer' },
                 estado: { type: 'keyword' },
-                respuesta: { type: 'text', analyzer: 'spanish_analyzer' },
                 fecha: { type: 'date' }
             }
         }
@@ -107,6 +113,30 @@ const INDEX_MAPPINGS = {
                 categoria: { type: 'keyword' },
                 contenido: { type: 'text', analyzer: 'spanish_analyzer' },
                 autor: { type: 'text', analyzer: 'spanish_analyzer' },
+                // Campos añadidos al esquema.
+                programa: { type: 'text', analyzer: 'spanish_analyzer' },
+                tipo_vigencia: { type: 'keyword' },
+                estado: { type: 'keyword' },
+                destacado: { type: 'boolean' },
+                fecha: { type: 'date' }
+            }
+        }
+    },
+    [INDICATORS.RESERVAS]: {
+        mappings: {
+            properties: {
+                id_reserva: { type: 'integer' },
+                id_usuario: { type: 'integer' },
+                id_recurso: { type: 'integer' },
+                // Se indexan los nombres resueltos (no solo los ids), que es
+                // lo que un usuario escribe al buscar: "laboratorio de redes".
+                recurso: { type: 'text', analyzer: 'spanish_analyzer' },
+                tipo_recurso: { type: 'keyword' },
+                ubicacion: { type: 'text', analyzer: 'spanish_analyzer' },
+                usuario: { type: 'text', analyzer: 'spanish_analyzer' },
+                motivo: { type: 'text', analyzer: 'spanish_analyzer' },
+                observaciones: { type: 'text', analyzer: 'spanish_analyzer' },
+                estado: { type: 'keyword' },
                 fecha: { type: 'date' }
             }
         }
@@ -114,28 +144,22 @@ const INDEX_MAPPINGS = {
 };
 
 async function createIndex(indexName) {
-    const existe = await client.indices.exists({ index: indexName });
-    if (existe) {
+    const exists = await client.indices.exists({ index: indexName });
+    if (exists) {
         await client.indices.delete({ index: indexName });
     }
+    const config = INDEX_MAPPINGS[indexName];
     await client.indices.create({
         index: indexName,
-        ...INDEX_MAPPINGS[indexName],
-        settings: {
-            // Un solo nodo en desarrollo: sin réplicas el índice queda green.
-            number_of_replicas: 0,
-            ...(INDEX_MAPPINGS[indexName].settings || {})
-        }
+        settings: ANALYSIS,
+        mappings: config.mappings
     });
     console.log(`Índice ${indexName} creado correctamente`);
 }
 
 async function indexUsuarios() {
-    // Se excluyen credenciales y tokens: nunca deben viajar al índice.
     const [rows] = await pool.query(`
-        SELECT u.id_usuario, u.identificacion, u.usuario, u.nombre, u.apellido,
-               u.correo, u.telefono, u.id_rol, u.tipo_usuario, u.programa,
-               u.cargo, u.campus, u.estado, r.nombre_rol
+        SELECT u.*, r.nombre_rol
         FROM usuarios u
         LEFT JOIN roles r ON u.id_rol = r.id_rol
     `);
@@ -191,7 +215,7 @@ async function indexSolicitudes() {
 async function indexPQRS() {
     const [rows] = await pool.query('SELECT * FROM pqrs');
     const operations = rows.flatMap(doc => [
-        { index: { _index: INDICATORS.PQRS, _id: String(doc.id_pqrs) } },
+        { index: { _index: INDICATORS.PQRS, _id: doc.id_pqrs } },
         doc
     ]);
     if (operations.length > 0) {
@@ -212,7 +236,69 @@ async function indexInfoAcademica() {
     console.log(`${rows.length} publicaciones académicas indexadas`);
 }
 
-async function run({ close = true } = {}) {
+async function indexReservas() {
+    // Se resuelven los nombres (recurso, usuario) para que la búsqueda
+    // encuentre la reserva por lo que el usuario escribe, no por ids.
+    const [rows] = await pool.query(`
+        SELECT r.id_reserva, r.id_usuario, r.id_recurso,
+               r.fecha_reserva, r.hora_inicio, r.hora_fin,
+               r.motivo, r.observaciones, r.estado,
+               rec.nombre_recurso AS recurso,
+               rec.tipo_recurso,
+               rec.ubicacion,
+               CONCAT(u.nombre, ' ', u.apellido) AS usuario
+        FROM reservas r
+        LEFT JOIN recursos rec ON r.id_recurso = rec.id_recurso
+        LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
+    `);
+    const operations = rows.flatMap(doc => [
+        { index: { _index: INDICATORS.RESERVAS, _id: doc.id_reserva.toString() } },
+        { ...doc, fecha: doc.fecha_reserva }
+    ]);
+    if (operations.length > 0) {
+        await client.bulk({ refresh: true, operations });
+    }
+    console.log(`${rows.length} reservas indexadas`);
+}
+
+// Índice de Elasticsearch -> función que lo rellena desde MySQL.
+const INDEXADORES = {
+    [INDICATORS.USUARIOS]: indexUsuarios,
+    [INDICATORS.RECURSOS]: indexRecursos,
+    [INDICATORS.EVENTOS]: indexEventos,
+    [INDICATORS.SOLICITUDES]: indexSolicitudes,
+    [INDICATORS.PQRS]: indexPQRS,
+    [INDICATORS.INFO_ACADEMICA]: indexInfoAcademica,
+    [INDICATORS.RESERVAS]: indexReservas
+};
+
+/**
+ * Reindexa (recreando el índice) uno o varios índices sin cerrar el pool ni
+ * el cliente de Elasticsearch. Pensado para llamarse desde el propio servicio
+ * en caliente, no como script de consola.
+ *
+ * @param {string[]} [indices] Nombres exactos de índice. Sin argumento: todos.
+ * @returns {Promise<{indices:string[], errores:Array}>}
+ */
+async function reindexar(indices) {
+    const objetivos = (indices && indices.length
+        ? indices
+        : Object.values(INDICATORS)
+    ).filter((nombre) => INDEXADORES[nombre]);
+
+    const errores = [];
+    for (const nombre of objetivos) {
+        try {
+            await createIndex(nombre);
+            await INDEXADORES[nombre]();
+        } catch (error) {
+            errores.push({ index: nombre, error: error.message });
+        }
+    }
+    return { indices: objetivos, errores };
+}
+
+async function run() {
     console.log('Iniciando indexación...');
     try {
         for (const indexName of Object.values(INDICATORS)) {
@@ -224,20 +310,14 @@ async function run({ close = true } = {}) {
         await indexSolicitudes();
         await indexPQRS();
         await indexInfoAcademica();
+        await indexReservas();
         console.log('Indexación completada exitosamente');
-        return true;
     } catch (error) {
-        console.error('Error en indexación:', error.message);
-        if (close) {
-            process.exitCode = 1;
-            throw error;
-        }
-        return false;
+        console.error('Error en indexación:', error);
+        process.exit(1);
     } finally {
-        if (close) {
-            await pool.end();
-            await client.close();
-        }
+        await pool.end();
+        await client.close();
     }
 }
 
@@ -247,10 +327,12 @@ if (require.main === module) {
 
 module.exports = {
     run,
+    reindexar,
     indexUsuarios,
     indexRecursos,
     indexEventos,
     indexSolicitudes,
     indexPQRS,
-    indexInfoAcademica
+    indexInfoAcademica,
+    indexReservas
 };

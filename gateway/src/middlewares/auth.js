@@ -1,72 +1,45 @@
 const jwt = require('jsonwebtoken');
 
+// Sin secreto configurado el gateway no arranca: un fallback hardcodeado
+// permitiría firmar tokens válidos con una clave pública del repositorio.
 const JWT_SECRET = process.env.JWT_SECRET;
-
 if (!JWT_SECRET) {
-    throw new Error('JWT_SECRET no está definido en el entorno');
-}
-
-// Rutas que no requieren token. Todo lo demás pasa por verificación JWT.
-const RUTAS_PUBLICAS = [
-    { method: 'POST', path: '/api/auth/login' },
-    { method: 'POST', path: '/api/auth/register' },
-    { method: 'GET', path: '/api/health' },
-    { method: 'GET', path: '/health' },
-    { method: 'GET', path: '/' }
-];
-
-function esPublica(req) {
-    const path = req.originalUrl.split('?')[0].replace(/\/+$/, '') || '/';
-    return RUTAS_PUBLICAS.some(
-        (ruta) => ruta.method === req.method && ruta.path === path
+    throw new Error(
+        'JWT_SECRET no está definido. Defínelo en el .env antes de arrancar el gateway.'
     );
 }
 
-/**
- * Verifica el JWT en el gateway y propaga la identidad a los servicios
- * mediante headers `x-user-*`. Los headers enviados por el cliente se
- * eliminan siempre para que no puedan suplantar a otro usuario.
- */
+// Rutas públicas: sin token. El resto exige un JWT válido.
+const RUTAS_PUBLICAS = [
+    { metodo: 'POST', patron: /^\/api\/auth\/login$/ },
+    { metodo: 'POST', patron: /^\/api\/auth\/register$/ },
+    { metodo: 'POST', patron: /^\/api\/auth\/recuperar$/ },
+    { metodo: 'POST', patron: /^\/api\/auth\/restablecer$/ }
+];
+
+function esPublica(req) {
+    const ruta = req.originalUrl.split('?')[0];
+    return RUTAS_PUBLICAS.some((r) => r.metodo === req.method && r.patron.test(ruta));
+}
+
 function authMiddleware(req, res, next) {
-    delete req.headers['x-user-id'];
-    delete req.headers['x-user-role'];
-    delete req.headers['x-user-name'];
-    delete req.headers['x-user-usuario'];
+    if (esPublica(req)) return next();
 
-    if (req.method === 'OPTIONS') {
-        return next();
-    }
-
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-
-    if (esPublica(req)) {
-        return next();
-    }
-
-    if (!token) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Token requerido' });
     }
 
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const id = Number(decoded.id ?? decoded.id_usuario);
-
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(401).json({ error: 'Token inválido' });
-        }
-
-        req.user = decoded;
-        req.headers['x-user-id'] = String(id);
-        req.headers['x-user-role'] = String(decoded.rol ?? '');
-        req.headers['x-user-name'] = String(decoded.nombre ?? '');
-        req.headers['x-user-usuario'] = String(decoded.usuario ?? '');
+        req.user = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
         next();
-    } catch {
-        return res.status(401).json({ error: 'Token inválido o expirado' });
+    } catch (error) {
+        const mensaje =
+            error.name === 'TokenExpiredError'
+                ? 'Sesión expirada, vuelve a iniciar sesión'
+                : 'Token inválido';
+        return res.status(401).json({ error: mensaje });
     }
 }
 
 module.exports = authMiddleware;
-module.exports.esPublica = esPublica;
-module.exports.RUTAS_PUBLICAS = RUTAS_PUBLICAS;

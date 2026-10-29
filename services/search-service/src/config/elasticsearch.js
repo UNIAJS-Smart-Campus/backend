@@ -22,7 +22,8 @@ const INDICATORS = {
     EVENTOS: `${INDEX_PREFIX}eventos`,
     SOLICITUDES: `${INDEX_PREFIX}solicitudes`,
     PQRS: `${INDEX_PREFIX}pqrs`,
-    INFO_ACADEMICA: `${INDEX_PREFIX}info_academica`
+    INFO_ACADEMICA: `${INDEX_PREFIX}info_academica`,
+    RESERVAS: `${INDEX_PREFIX}reservas`
 };
 
 module.exports = { client, INDICATORS, INDEX_PREFIX };

@@ -14,10 +14,6 @@ app.get('/', (req, res) => {
     });
 });
 
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', service: 'resources-service', timestamp: new Date().toISOString() });
-});
-
 app.use('/api/resources', require('./routes/resources.routes'));
 
 app.use(require('./middlewares/errorHandler'));
