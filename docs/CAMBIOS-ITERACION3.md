@@ -80,7 +80,7 @@ Alineación del esquema con la tabla real `usuarios` (que usa `identificacion`, 
 - `login`: busca por `identificacion` y devuelve `identificacion`, `usuario` y `rol` (claves que espera el frontend).
 - `register` / `me`: eliminan las columnas inexistentes `usuario` y `programa`.
 
-> Nota: las credenciales de prueba de la BD recargada son `admin/admin123` (Administrador), `funcionario/func123` (Administrativo), `profesor/prof123` (Docente) y `estudiante/est123` (Estudiante).
+> Nota: las credenciales de prueba no se publican en el repositorio; consulta el archivo local `LOGINS_USUARIOS.md` (excluido por `.gitignore`).
 
 ---
 
@@ -165,7 +165,7 @@ docker compose -f docker-compose.yml config --quiet   # ✓ exit 0
 # Login real a través del gateway
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identificacion":"admin","password":"admin123"}'   # → HTTP 200 + token
+  -d '{"identificacion":"admin","password":"<tu-contraseña>"}'   # → HTTP 200 + token
 ```
 
 ---

@@ -2,22 +2,22 @@
 
 ## Credenciales de Acceso
 
-| ID | Identificación | Usuario | Contraseña | Nombre | Apellido | Rol | Programa/Área | Email |
-|----|----------------|---------|------------|--------|----------|-----|---------------|-------|
-| 1 | 1023456789 | admin | admin123 | Natalia | Rodríguez | Administrador | - | natalia.rodriguez@uajs.edu.co |
-| 2 | 1023456788 | funcionario | func123 | Carlos | Méndez | Administrativo | Bienestar Universitario | carlos.mendez@uajs.edu.co |
-| 3 | 1023456787 | profesor | prof123 | Laura | Gómez | Docente | Matemáticas | laura.gomez@uajs.edu.co |
-| 4 | 1023456786 | estudiante | est123 | Andrés | Torres | Estudiante | Ingeniería de Sistemas | andres.torres@uajs.edu.co |
-| 5 | 1023456785 | lucia.paredes | prof123 | Lucía | Paredes | Docente | Ingeniería de Sistemas | lucia.paredes@uajs.edu.co |
-| 6 | 1023456784 | andres.ruiz | est123 | Andrés | Ruiz | Estudiante | Ingeniería de Sistemas | andres.ruiz@uajs.edu.co |
-| 7 | 1023456783 | maria.torres | est123 | María | Torres | Estudiante | Ingeniería de Sistemas | maria.torres@uajs.edu.co |
-| 8 | 1023456782 | jorge.salazar | est123 | Jorge | Salazar | Estudiante | Ingeniería de Sistemas | jorge.salazar@uajs.edu.co |
+| ID | Identificación | Usuario | Nombre | Apellido | Rol | Programa/Área | Email |
+|----|----------------|---------|--------|----------|-----|---------------|-------|
+| 1 | 1023456789 | admin | Natalia | Rodríguez | Administrador | - | natalia.rodriguez@uajs.edu.co |
+| 2 | 1023456788 | funcionario | Carlos | Méndez | Administrativo | Bienestar Universitario | carlos.mendez@uajs.edu.co |
+| 3 | 1023456787 | profesor | Laura | Gómez | Docente | Matemáticas | laura.gomez@uajs.edu.co |
+| 4 | 1023456786 | estudiante | Andrés | Torres | Estudiante | Ingeniería de Sistemas | andres.torres@uajs.edu.co |
+| 5 | 1023456785 | lucia.paredes | Lucía | Paredes | Docente | Ingeniería de Sistemas | lucia.paredes@uajs.edu.co |
+| 6 | 1023456784 | andres.ruiz | Andrés | Ruiz | Estudiante | Ingeniería de Sistemas | andres.ruiz@uajs.edu.co |
+| 7 | 1023456783 | maria.torres | María | Torres | Estudiante | Ingeniería de Sistemas | maria.torres@uajs.edu.co |
+| 8 | 1023456782 | jorge.salazar | Jorge | Salazar | Estudiante | Ingeniería de Sistemas | jorge.salazar@uajs.edu.co |
 
 ---
 
 ## Nuevos Usuarios (Carga Masiva)
 
-### Estudiantes (8) - Contraseña: `est123`
+### Estudiantes (8)
 | ID | Identificación | Usuario | Nombre | Apellido | Programa | Email |
 |----|----------------|---------|--------|----------|----------|-------|
 | 35 | 1023456781 | estudiante1 | Carlos | García | Ingeniería de Sistemas | carlos.garcia@uajs.edu.co |
@@ -31,7 +31,7 @@
 
 ---
 
-### Docentes (5) - Contraseña: `doc123`
+### Docentes (5)
 | ID | Identificación | Usuario | Nombre | Apellido | Programa | Email |
 |----|----------------|---------|--------|----------|----------|-------|
 | 43 | 1023456773 | docente1 | Roberto | Castro | Matemáticas | roberto.castro@uajs.edu.co |
@@ -42,7 +42,7 @@
 
 ---
 
-### Administrativos (2) - Contraseña: `adm123`
+### Administrativos (2)
 | ID | Identificación | Usuario | Nombre | Apellido | Área | Email |
 |----|----------------|---------|--------|----------|------|-------|
 | 48 | 1023456768 | admin1 | Gloria | Jiménez | Bienestar Universitario | gloria.jimenez@uajs.edu.co |
@@ -50,7 +50,7 @@
 
 ---
 
-### Funcionarios (3) - Contraseña: `fun123` (Rol: Administrativo)
+### Funcionarios (3) (Rol: Administrativo)
 | ID | Identificación | Usuario | Nombre | Apellido | Área | Email |
 |----|----------------|---------|--------|----------|------|-------|
 | 50 | 1023456766 | func1 | Oscar | Herrera | Mantenimiento | oscar.herrera@uajs.edu.co |
@@ -78,27 +78,27 @@
 # Login Admin
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identificacion":"1023456789","password":"admin123"}'
+  -d '{"identificacion":"1023456789","password":"<tu-contraseña>"}'
 
 # Login Estudiante
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identificacion":"1023456781","password":"est123"}'
+  -d '{"identificacion":"1023456781","password":"<tu-contraseña>"}'
 
 # Login Docente
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identificacion":"1023456773","password":"doc123"}'
+  -d '{"identificacion":"1023456773","password":"<tu-contraseña>"}'
 
 # Login Administrativo
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identificacion":"1023456768","password":"adm123"}'
+  -d '{"identificacion":"1023456768","password":"<tu-contraseña>"}'
 
 # Login Funcionario
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"identificacion":"1023456766","password":"fun123"}'
+  -d '{"identificacion":"1023456766","password":"<tu-contraseña>"}'
 ```
 
 ---

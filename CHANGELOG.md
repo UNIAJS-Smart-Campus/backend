@@ -435,7 +435,7 @@ cuatro roles que no existen en la BD (`Egresado`, `Funcionario`, `Proveedor`, `V
     no del texto tecleado.
   - Duplicados (`ER_DUP_ENTRY`) devuelven 409 con mensaje claro.
 - **`backend/services/auth-service/src/middlewares/auth.js`**: eliminado el fallback
-  `'uajs_secret_key_2026'`.
+  `'<secreto por defecto antiguo>'`.
 - **Verificación:** `node --check` OK.
 
 ### 4. Usuarios: bcrypt, roles válidos y autorización

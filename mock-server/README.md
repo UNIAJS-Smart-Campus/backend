@@ -73,16 +73,9 @@ El servidor se ejecuta en `http://localhost:3000` por defecto.
 
 ## Usuarios de Prueba
 
-| Usuario | Contraseña | Rol |
-|---------|------------|-----|
-| admin | admin123 | Administrador |
-| funcionario | func123 | Administrativo |
-| profesor | prof123 | Docente |
-| estudiante | est123 | Estudiante |
-| docente2 | doc123 | Docente |
-| estudiante2 | stu123 | Estudiante |
-| admin2 | ua123 | Administrador |
-| admvo | adm123 | Administrativo |
+Las contraseñas de demo no se publican en el repositorio. Están guardadas con hash bcrypt en
+`server.js` (el login funciona igual); consulta el archivo local `LOGINS_USUARIOS.md`
+(excluido por `.gitignore`) o pídelas al equipo.
 
 ## Configuración
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 app.use(cors());
@@ -13,14 +14,14 @@ const PORT = process.env.MOCK_PORT || 3000;
 // ==========================================
 
 const USERS = [
-  { id: 1, usuario: "admin", password: "admin123", nombre: "Natalia Rodríguez", correo: "natalia.rodriguez@uajs.edu.co", rol: "Administrador", programa: "Dirección Académica", estado: "Activo", cargo: "Coordinadora general", campus: "Campus principal" },
-  { id: 2, usuario: "funcionario", password: "func123", nombre: "Carlos Méndez", correo: "carlos.mendez@uajs.edu.co", rol: "Administrativo", programa: "Bienestar Universitario", estado: "Activo", cargo: "Analista de servicios", campus: "Campus Norte" },
-  { id: 3, usuario: "profesor", password: "prof123", nombre: "Laura Gómez", correo: "laura.gomez@uajs.edu.co", rol: "Docente", programa: "Matemáticas", estado: "Activo", cargo: "Docente titular", campus: "Campus central" },
-  { id: 4, usuario: "estudiante", password: "est123", nombre: "Andrés Torres", correo: "andres.torres@uajs.edu.co", rol: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus central" },
-  { id: 5, usuario: "docente2", password: "doc123", nombre: "María Fernanda Cárdenas", correo: "mf.cardenas@uajs.edu.co", rol: "Docente", programa: "Ingeniería de Software", estado: "Activo", cargo: "Profesora de proyectos", campus: "Campus principal" },
-  { id: 6, usuario: "estudiante2", password: "stu123", nombre: "Valentina Morales", correo: "valentina.morales@uajs.edu.co", rol: "Estudiante", programa: "Administración de Empresas", estado: "Activo", cargo: "Estudiante", campus: "Campus occidente" },
-  { id: 7, usuario: "admin2", password: "ua123", nombre: "Javier Álvarez", correo: "javier.alvarez@uajs.edu.co", rol: "Administrador", programa: "Tecnología e innovación", estado: "Activo", cargo: "Director de operación", campus: "Campus principal" },
-  { id: 8, usuario: "admvo", password: "adm123", nombre: "Sofía Jiménez", correo: "sofia.jimenez@uajs.edu.co", rol: "Administrativo", programa: "Servicios estudiantiles", estado: "Inactivo", cargo: "Coordinadora administrativa", campus: "Campus centro" }
+  { id: 1, usuario: "admin", password: "$2b$10$pbeWFX1Tk.1VMle5WjvdP.S6k/qFdj7sVNcFmOMhMyXqiUA0nQwRC", nombre: "Natalia Rodríguez", correo: "natalia.rodriguez@uajs.edu.co", rol: "Administrador", programa: "Dirección Académica", estado: "Activo", cargo: "Coordinadora general", campus: "Campus principal" },
+  { id: 2, usuario: "funcionario", password: "$2b$10$hInVceeGUBrI0HRqwqdHwuBRyMTW5nG3.BQJvheubu78xiAkwLtkW", nombre: "Carlos Méndez", correo: "carlos.mendez@uajs.edu.co", rol: "Administrativo", programa: "Bienestar Universitario", estado: "Activo", cargo: "Analista de servicios", campus: "Campus Norte" },
+  { id: 3, usuario: "profesor", password: "$2b$10$hNiKOE0sb1eZ5vxYA3pdOucMLHY2CMXkugft0XI2nuX.ubEZmWu8S", nombre: "Laura Gómez", correo: "laura.gomez@uajs.edu.co", rol: "Docente", programa: "Matemáticas", estado: "Activo", cargo: "Docente titular", campus: "Campus central" },
+  { id: 4, usuario: "estudiante", password: "$2b$10$QRxek7T64RKjDscNxbHVXeY4q3.2kvxZkUCqlygjSZ7MkuixvNFaS", nombre: "Andrés Torres", correo: "andres.torres@uajs.edu.co", rol: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus central" },
+  { id: 5, usuario: "docente2", password: "$2b$10$SrkujDaRO7eQ88l87Sp/M.201x1FI.oaqD2b5OHAqKu18A3FcqoAm", nombre: "María Fernanda Cárdenas", correo: "mf.cardenas@uajs.edu.co", rol: "Docente", programa: "Ingeniería de Software", estado: "Activo", cargo: "Profesora de proyectos", campus: "Campus principal" },
+  { id: 6, usuario: "estudiante2", password: "$2b$10$jYOKmMUgj6K2jQoL3jPpCOGwUBe9k6Nr6S/Cu4INloR1agOWrWGSi", nombre: "Valentina Morales", correo: "valentina.morales@uajs.edu.co", rol: "Estudiante", programa: "Administración de Empresas", estado: "Activo", cargo: "Estudiante", campus: "Campus occidente" },
+  { id: 7, usuario: "admin2", password: "$2b$10$WBphNKiQjzwaLMcYc58fdOBpI4arewaTlTDT/KxvnWH.bVG2cJIyK", nombre: "Javier Álvarez", correo: "javier.alvarez@uajs.edu.co", rol: "Administrador", programa: "Tecnología e innovación", estado: "Activo", cargo: "Director de operación", campus: "Campus principal" },
+  { id: 8, usuario: "admvo", password: "$2b$10$SDdQcwEI.JOWiwEurOIpK.vdCqOsBjLMWW1ICWYolf45srN00q7Yu", nombre: "Sofía Jiménez", correo: "sofia.jimenez@uajs.edu.co", rol: "Administrativo", programa: "Servicios estudiantiles", estado: "Inactivo", cargo: "Coordinadora administrativa", campus: "Campus centro" }
 ];
 
 const ROLES = [
@@ -135,8 +136,8 @@ app.use(authMiddleware);
 app.post('/api/auth/login', async (req, res) => {
   await delay();
   const { identificacion, password } = req.body;
-  const user = USERS.find(u => (u.usuario === identificacion || u.correo === identificacion) && u.password === password);
-  if (!user) {
+  const user = USERS.find(u => (u.usuario === identificacion || u.correo === identificacion));
+  if (!user || !(await bcrypt.compare(password, user.password))) {
     return res.status(401).json({ error: 'Credenciales inválidas' });
   }
   const token = Buffer.from(JSON.stringify({ id: user.id, usuario: user.usuario, rol: user.rol })).toString('base64');

@@ -95,7 +95,7 @@ module.exports = {
 
 ### 2.4 Autenticación (auth-service)
 
-- **JWT**: firma con `JWT_SECRET` (default `uajs_secret_key_2026`) y expira en `JWT_EXPIRES` (default `24h`).
+- **JWT**: firma con `JWT_SECRET` (obligatorio, sin valor por defecto) y expira en `JWT_EXPIRES` (default `24h`).
 - Endpoints: `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/auth/me`.
 - El `login` recibe `{ identificacion, password }`, busca en `usuarios` por `identificacion` y compara la contraseña (en claro en desarrollo).
 

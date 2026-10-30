@@ -266,12 +266,8 @@ Implementación del módulo **8.1 Autenticación y usuarios** de la plataforma (
 
 **Credenciales de prueba:**
 
-| Rol | Usuario | Contraseña |
-|-----|---------|------------|
-| Administrador | `admin` | `admin123` |
-| Administrativo | `funcionario` | `func123` |
-| Docente | `profesor` | `prof123` |
-| Estudiante | `estudiante` | `est123` |
+> Las credenciales de demo no se publican en el repositorio. Usa el archivo local `LOGINS_USUARIOS.md` (excluido por `.gitignore`) o pídelas al equipo.
+
 
 **Archivos nuevos:**
 
@@ -327,7 +323,7 @@ El modelo de roles se alineó con la especificación del documento (7. Usuarios 
 | `publicar_eventos` | Docente, Administrativo, Administrador | Eventos: botón "+ Publicar evento" (Modal) |
 | `gestionar_reservas` | Docente, Administrativo, Administrador | Reservas: botón "Cancelar" en Mis reservas |
 
-**Credenciales (sección 7):** `admin/admin123` (Administrador), `funcionario/func123` (Administrativo), `profesor/prof123` (Docente), `estudiante/est123` (Estudiante).
+**Credenciales (sección 7):** no se publican en el repositorio; consulta el archivo local `LOGINS_USUARIOS.md` (excluido por `.gitignore`).
 
 ---
 
