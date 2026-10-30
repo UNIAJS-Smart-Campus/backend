@@ -32,6 +32,122 @@ const USERS = [
 // Quita el hash de contraseña antes de enviar un usuario al cliente.
 const sinPassword = ({ password, ...resto }) => resto;
 
+// ==========================================
+// ADAPTADORES: modelo interno -> fila de BD
+// El mock guarda los datos con nombres "de UI" (id, nombre, hora...), pero
+// el backend real responde columnas en snake_case. Sin esta traducción los
+// mapeos del frontend reciben undefined y las tarjetas salen sin título ni
+// identificador.
+// ==========================================
+const SERVICIO_ID = { Solicitudes: 1, Reservas: 2, Eventos: 3, Recursos: 4, PQRS: 5 };
+
+const soloNumero = (valor) => {
+  const encontrado = String(valor ?? "").match(/(\d+)$/);
+  return encontrado ? Number(encontrado[1]) : null;
+};
+
+const idUsuarioPorNombre = (nombre) => {
+  const user = USERS.find(u => `${u.nombre} ${u.apellido}`.trim() === String(nombre || "").trim());
+  return user ? user.id_usuario : null;
+};
+
+const sumarHoras = (hora, horas = 2) => {
+  const [h, m] = String(hora || "00:00").split(":").map(Number);
+  return `${String((Number(h) + horas) % 24).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
+};
+
+const aSolicitud = (s) => ({
+  id_solicitud: soloNumero(s.id),
+  codigo: s.id,
+  tipo: s.tipo,
+  id_servicio: SERVICIO_ID[s.servicio] ?? null,
+  servicio_nombre: s.servicio || "",
+  prioridad: s.prioridad || "Media",
+  dependencia: s.dependencia || "",
+  fecha_solicitud: s.fecha_solicitud || s.fecha || "",
+  descripcion: s.descripcion || "",
+  estado: s.estado || "Registrada",
+  respuesta: s.respuesta || "",
+  solicitante: s.solicitante || "",
+  usuario_nombre: s.solicitante || "",
+  usuario_apellido: "",
+  id_usuario: s.id_usuario ?? idUsuarioPorNombre(s.solicitante),
+  id_responsable: s.id_responsable ?? null,
+  responsable_nombre: s.responsable || "",
+  historial: Array.isArray(s.historial) ? s.historial : []
+});
+
+const aEvento = (e) => ({
+  id_evento: e.id_evento ?? e.id,
+  nombre_evento: e.nombre_evento || e.nombre || "",
+  descripcion: e.descripcion || "",
+  fecha: e.fecha || "",
+  hora_inicio: e.hora_inicio || e.hora || "",
+  hora_fin: e.hora_fin || sumarHoras(e.hora || e.hora_inicio),
+  ubicacion: e.ubicacion || e.lugar || "",
+  tipo_evento: e.tipo_evento || e.categoria || "",
+  estado: e.estado === "Activo" ? "Programado" : (e.estado || "Programado"),
+  cupo: Number(e.cupo) || 0,
+  inscritos: Number(e.inscritos) || 0,
+  id_usuario: e.id_usuario ?? null,
+  ponente: e.ponente || "",
+  modalidad: e.modalidad || ""
+});
+
+const TITULO_NOTIFICACION = {
+  Solicitud: "Actualización de solicitud",
+  Reserva: "Movimiento de reserva",
+  Evento: "Nuevo evento",
+  PQRS: "Respuesta a PQRS"
+};
+
+const aNotificacion = (n) => ({
+  id_notificacion: n.id_notificacion ?? n.id,
+  id_usuario: n.id_usuario ?? 1,
+  titulo: n.titulo || TITULO_NOTIFICACION[n.tipo] || "Notificación",
+  mensaje: n.mensaje || "",
+  tipo_notificacion: n.tipo_notificacion || n.tipo || "info",
+  icono: n.icono || "bell",
+  leida: n.leida === true || Number(n.leida) === 1 ? 1 : 0,
+  fecha_envio: n.fecha_envio || (n.fecha ? `${n.fecha} 00:00:00` : "")
+});
+
+const aRecurso = (r) => ({
+  id_recurso: r.id_recurso ?? r.id,
+  codigo: r.codigo || "",
+  nombre_recurso: r.nombre_recurso || r.nombre || "",
+  tipo_recurso: r.tipo_recurso || r.tipo || "",
+  descripcion: r.descripcion || "",
+  ubicacion: r.ubicacion || "",
+  capacidad: r.capacidad ?? null,
+  estado: r.estado === "Activo" ? "Disponible" : (r.estado || "Disponible"),
+  disponibilidad: r.disponibilidad || "Disponible"
+});
+
+const aPqrs = (p) => ({
+  id_pqrs: p.id_pqrs ?? soloNumero(p.id),
+  codigo: p.codigo || p.id,
+  id_usuario: p.id_usuario ?? idUsuarioPorNombre(p.solicitante || p.nombre),
+  tipo: p.tipo,
+  fecha: p.fecha || "",
+  estado: p.estado || "Registrada",
+  descripcion: p.descripcion || "",
+  respuesta: p.respuesta || "",
+  fecha_respuesta: p.fecha_respuesta || null,
+  prioridad: p.prioridad || "Media",
+  asignado_a: p.asignado_a || p.asignadoA || "",
+  asunto: p.asunto || String(p.descripcion || "").slice(0, 80),
+  nombre: p.nombre || p.solicitante || "",
+  sede: p.sede || "SINCELEJO",
+  area: p.area || "PQRS",
+  tipo_perfil: p.tipo_perfil || "Estudiante",
+  tipo_documento: p.tipo_documento || "",
+  identificacion: p.identificacion || "",
+  telefono: p.telefono || "",
+  correo: p.correo || "",
+  adjunto: p.adjunto ?? null
+});
+
 const ROLES = [
   { nombre: "Administrador", permisos: ["dashboard","usuarios","solicitudes","reservas","recursos","eventos","notificaciones","pqrs","reportes","perfil","configuracion","info_academica"], acciones: ["registrar_solicitudes","consultar_solicitudes","gestionar_solicitudes","actualizar_estados","realizar_reservas","gestionar_reservas","solicitar_recursos","administrar_recursos","publicar_eventos","consultar_estadisticas","administrar_usuarios","administrar_roles","gestionar_servicios","gestionar_configuracion","supervisar","publicar_info_academica"] },
   { nombre: "Administrativo", permisos: ["dashboard","solicitudes","reservas","recursos","eventos","notificaciones","pqrs","perfil","reportes","configuracion"], acciones: ["consultar_solicitudes","gestionar_solicitudes","actualizar_estados","gestionar_reservas","administrar_recursos","atender_requerimientos","generar_reportes"] },
@@ -88,12 +204,12 @@ const RECURSOS = [
 ];
 
 const RESERVAS = [
-  { recurso: "Salón 101", estado: "Confirmada" },
-  { recurso: "Laboratorio de informática 1", estado: "Pendiente" },
-  { recurso: "Auditorio principal", estado: "Confirmada" },
-  { recurso: "Laboratorio de química", estado: "Cancelada" },
-  { recurso: "Salón 205", estado: "Confirmada" },
-  { recurso: "Video proyector", estado: "Pendiente" }
+  { id_reserva: 1, id_usuario: 1, id_recurso: "R-005", usuario_nombre: "Natalia Rodríguez", nombre_recurso: "Auditorio principal", tipo_recurso: "Auditorios", fecha_reserva: "2026-09-03", hora_inicio: "08:00", hora_fin: "10:00", motivo: "Cátedra de inteligencia artificial", observaciones: "", estado: "Confirmada" },
+  { id_reserva: 2, id_usuario: 4, id_recurso: "R-003", usuario_nombre: "Andrés Torres", nombre_recurso: "Laboratorio de informática 1", tipo_recurso: "Laboratorios", fecha_reserva: "2026-09-05", hora_inicio: "14:00", hora_fin: "16:00", motivo: "Práctica de redes", observaciones: "", estado: "Pendiente" },
+  { id_reserva: 3, id_usuario: 3, id_recurso: "R-005", usuario_nombre: "Laura Gómez", nombre_recurso: "Auditorio principal", tipo_recurso: "Auditorios", fecha_reserva: "2026-09-08", hora_inicio: "09:00", hora_fin: "11:00", motivo: "Conferencia académica", observaciones: "", estado: "Confirmada" },
+  { id_reserva: 4, id_usuario: 2, id_recurso: "R-004", usuario_nombre: "Carlos Méndez", nombre_recurso: "Laboratorio de química", tipo_recurso: "Laboratorios", fecha_reserva: "2026-09-10", hora_inicio: "10:00", hora_fin: "12:00", motivo: "Práctica de laboratorio", observaciones: "Cancelada por mantenimiento.", estado: "Cancelada" },
+  { id_reserva: 5, id_usuario: 5, id_recurso: "R-002", usuario_nombre: "Lucía Paredes", nombre_recurso: "Salón 205", tipo_recurso: "Salas", fecha_reserva: "2026-09-12", hora_inicio: "07:00", hora_fin: "09:00", motivo: "Tutoría de proyectos", observaciones: "", estado: "Confirmada" },
+  { id_reserva: 6, id_usuario: 6, id_recurso: "R-007", usuario_nombre: "Andrés Ruiz", nombre_recurso: "Video proyector Epson 4K", tipo_recurso: "Equipos", fecha_reserva: "2026-09-15", hora_inicio: "13:00", hora_fin: "15:00", motivo: "Feria de empleabilidad", observaciones: "", estado: "Pendiente" }
 ];
 
 const SERVICIOS = [
@@ -111,6 +227,26 @@ let eventos = [...EVENTOS];
 let notificaciones = [...NOTIFICACIONES];
 let pqrs = [...PQRS];
 let recursos = [...RECURSOS];
+let reservas = [...RESERVAS];
+
+// Búsquedas tolerantes: el frontend puede enviar el id interno o el de BD.
+const buscarSolicitud = (id) =>
+  solicitudes.find(s => String(s.id) === String(id) || String(s.codigo) === String(id));
+
+const buscarEvento = (id) =>
+  eventos.find(e => String(e.id) === String(id) || String(e.id_evento) === String(id));
+
+const buscarNotificacion = (id) =>
+  notificaciones.find(n => String(n.id) === String(id) || String(n.id_notificacion) === String(id));
+
+const buscarPqrs = (id) =>
+  pqrs.find(p => String(p.id) === String(id) || String(soloNumero(p.id)) === String(id));
+
+const buscarRecurso = (id) =>
+  recursos.find(r => String(r.id) === String(id) || String(r.id_recurso) === String(id));
+
+const buscarReserva = (id) =>
+  reservas.find(r => String(r.id_reserva) === String(id));
 
 // ==========================================
 // HELPER: Simular delay de red
@@ -192,14 +328,14 @@ app.get('/api/users/roles', async (req, res) => {
 // ==========================================
 app.get('/api/requests', async (req, res) => {
   await delay();
-  res.json({ data: solicitudes });
+  res.json({ data: solicitudes.map(aSolicitud) });
 });
 
 app.get('/api/requests/:id', async (req, res) => {
   await delay();
-  const item = solicitudes.find(s => s.id === req.params.id);
+  const item = buscarSolicitud(req.params.id);
   if (!item) return res.status(404).json({ error: 'Solicitud no encontrada' });
-  res.json({ data: item });
+  res.json({ data: aSolicitud(item) });
 });
 
 app.post('/api/requests', async (req, res) => {
@@ -212,27 +348,27 @@ app.post('/api/requests', async (req, res) => {
     historial: [{ estado: "Registrada", fecha: new Date().toISOString().slice(0, 10), detalle: "Solicitud registrada por el usuario." }]
   };
   solicitudes = [nueva, ...solicitudes];
-  res.status(201).json({ data: nueva });
+  res.status(201).json({ data: aSolicitud(nueva) });
 });
 
 app.put('/api/requests/:id', async (req, res) => {
   await delay();
-  const idx = solicitudes.findIndex(s => s.id === req.params.id);
+  const idx = solicitudes.findIndex(s => String(s.id) === String(req.params.id));
   if (idx === -1) return res.status(404).json({ error: 'Solicitud no encontrada' });
   solicitudes[idx] = { ...solicitudes[idx], ...req.body };
-  res.json({ data: solicitudes[idx] });
+  res.json({ data: aSolicitud(solicitudes[idx]) });
 });
 
 app.patch('/api/requests/:id/advance', async (req, res) => {
   await delay();
   const ESTADOS = ["Registrada", "En revisión", "Asignada", "En proceso", "Resuelta", "Cerrada"];
-  const idx = solicitudes.findIndex(s => s.id === req.params.id);
+  const idx = solicitudes.findIndex(s => String(s.id) === String(req.params.id));
   if (idx === -1) return res.status(404).json({ error: 'Solicitud no encontrada' });
   const posicion = ESTADOS.indexOf(solicitudes[idx].estado);
   if (posicion < ESTADOS.length - 1) {
     solicitudes[idx].estado = ESTADOS[posicion + 1];
   }
-  res.json({ data: solicitudes[idx] });
+  res.json({ data: aSolicitud(solicitudes[idx]) });
 });
 
 app.delete('/api/requests/:id', async (req, res) => {
@@ -246,45 +382,47 @@ app.delete('/api/requests/:id', async (req, res) => {
 // ==========================================
 app.get('/api/events', async (req, res) => {
   await delay();
-  res.json({ data: eventos });
+  res.json({ data: eventos.map(aEvento) });
 });
 
 app.get('/api/events/:id', async (req, res) => {
   await delay();
-  const item = eventos.find(e => e.id === Number(req.params.id));
+  const item = buscarEvento(req.params.id);
   if (!item) return res.status(404).json({ error: 'Evento no encontrado' });
-  res.json({ data: item });
+  res.json({ data: aEvento(item) });
 });
 
 app.post('/api/events', async (req, res) => {
   await delay();
   const nuevo = { id: Date.now(), ...req.body, inscritos: 0 };
   eventos = [nuevo, ...eventos];
-  res.status(201).json({ data: nuevo });
+  res.status(201).json({ data: aEvento(nuevo) });
 });
 
 app.put('/api/events/:id', async (req, res) => {
   await delay();
-  const idx = eventos.findIndex(e => e.id === Number(req.params.id));
+  const idx = eventos.findIndex(e => String(e.id) === String(req.params.id) || String(e.id_evento) === String(req.params.id));
   if (idx === -1) return res.status(404).json({ error: 'Evento no encontrado' });
   eventos[idx] = { ...eventos[idx], ...req.body };
-  res.json({ data: eventos[idx] });
+  res.json({ data: aEvento(eventos[idx]) });
 });
 
 app.delete('/api/events/:id', async (req, res) => {
   await delay();
-  eventos = eventos.filter(e => e.id !== Number(req.params.id));
+  const item = buscarEvento(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Evento no encontrado' });
+  eventos = eventos.filter(e => e !== item);
   res.json({ data: { success: true } });
 });
 
 app.post('/api/events/:id/register', async (req, res) => {
   await delay();
-  const idx = eventos.findIndex(e => e.id === Number(req.params.id));
-  if (idx === -1) return res.status(404).json({ error: 'Evento no encontrado' });
-  if (eventos[idx].inscritos < eventos[idx].cupo) {
-    eventos[idx].inscritos += 1;
+  const item = buscarEvento(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Evento no encontrado' });
+  if (item.inscritos < item.cupo) {
+    item.inscritos += 1;
   }
-  res.json({ data: eventos[idx] });
+  res.json({ data: aEvento(item) });
 });
 
 // ==========================================
@@ -292,21 +430,61 @@ app.post('/api/events/:id/register', async (req, res) => {
 // ==========================================
 app.get('/api/notifications', async (req, res) => {
   await delay();
-  res.json({ data: notificaciones });
+  // Los datos demo son compartidos; se ignoran los filtros por usuario para
+  // que cualquier cuenta vea el buzón completo.
+  res.json({ data: notificaciones.map(aNotificacion) });
+});
+
+app.post('/api/notifications', async (req, res) => {
+  await delay();
+  const { tipo_notificacion, fecha_envio, ...resto } = req.body || {};
+  const nueva = {
+    id: Date.now(),
+    ...resto,
+    tipo: tipo_notificacion || resto.tipo || "info",
+    fecha: String(fecha_envio || resto.fecha || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
+    leida: Boolean(Number(resto.leida))
+  };
+  notificaciones = [nueva, ...notificaciones];
+  res.status(201).json({ data: aNotificacion(nueva) });
+});
+
+app.put('/api/notifications/:id', async (req, res) => {
+  await delay();
+  const item = buscarNotificacion(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Notificación no encontrada' });
+  const { tipo_notificacion, fecha_envio, leida, ...resto } = req.body || {};
+  const actualizada = {
+    ...item,
+    ...resto,
+    ...(tipo_notificacion ? { tipo: tipo_notificacion } : {}),
+    ...(fecha_envio ? { fecha: String(fecha_envio).slice(0, 10) } : {}),
+    ...(leida !== undefined ? { leida: Boolean(Number(leida)) } : {})
+  };
+  notificaciones = notificaciones.map(n => (n === item ? actualizada : n));
+  res.json({ data: aNotificacion(actualizada) });
+});
+
+app.delete('/api/notifications/:id', async (req, res) => {
+  await delay();
+  const item = buscarNotificacion(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Notificación no encontrada' });
+  notificaciones = notificaciones.filter(n => n !== item);
+  res.json({ data: { success: true } });
 });
 
 app.patch('/api/notifications/:id/read', async (req, res) => {
   await delay();
-  const idx = notificaciones.findIndex(n => n.id === Number(req.params.id));
-  if (idx === -1) return res.status(404).json({ error: 'Notificación no encontrada' });
-  notificaciones[idx].leida = true;
-  res.json({ data: notificaciones[idx] });
+  const item = buscarNotificacion(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Notificación no encontrada' });
+  item.leida = true;
+  res.json({ data: aNotificacion(item) });
 });
 
 app.patch('/api/notifications/read-all', async (req, res) => {
   await delay();
   notificaciones = notificaciones.map(n => ({ ...n, leida: true }));
-  res.json({ data: notificaciones });
+  res.json({ data: notificaciones.map(aNotificacion) });
 });
 
 // ==========================================
@@ -314,14 +492,14 @@ app.patch('/api/notifications/read-all', async (req, res) => {
 // ==========================================
 app.get('/api/feedback', async (req, res) => {
   await delay();
-  res.json({ data: pqrs });
+  res.json({ data: pqrs.map(aPqrs) });
 });
 
 app.get('/api/feedback/:id', async (req, res) => {
   await delay();
-  const item = pqrs.find(p => p.id === req.params.id);
+  const item = buscarPqrs(req.params.id);
   if (!item) return res.status(404).json({ error: 'PQRS no encontrada' });
-  res.json({ data: item });
+  res.json({ data: aPqrs(item) });
 });
 
 app.post('/api/feedback', async (req, res) => {
@@ -332,7 +510,7 @@ app.post('/api/feedback', async (req, res) => {
     fecha: fechaHoy,
     estado: "Registrada",
     prioridad: req.body.prioridad || "Media",
-    asignadoA: "",
+    asignadoA: req.body.asignado_a || "",
     respuesta: "",
     historial: [{ estado: "Registrada", fecha: fechaHoy, detalle: "PQRS registrada por el usuario." }],
     ...req.body
@@ -342,14 +520,14 @@ app.post('/api/feedback', async (req, res) => {
   nueva.estado = "Registrada";
   nueva.historial = [{ estado: "Registrada", fecha: fechaHoy, detalle: "PQRS registrada por el usuario." }];
   pqrs = [nueva, ...pqrs];
-  res.status(201).json({ data: nueva });
+  res.status(201).json({ data: aPqrs(nueva) });
 });
 
 app.put('/api/feedback/:id', async (req, res) => {
   await delay();
-  const idx = pqrs.findIndex(p => p.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'PQRS no encontrada' });
-  const actual = pqrs[idx];
+  const item = buscarPqrs(req.params.id);
+  if (!item) return res.status(404).json({ error: 'PQRS no encontrada' });
+  const actual = item;
   const actualizado = { ...actual, ...req.body };
   const fechaHoy = new Date().toISOString().slice(0, 10);
   if (req.body.estado && req.body.estado !== actual.estado) {
@@ -358,15 +536,15 @@ app.put('/api/feedback/:id', async (req, res) => {
       { estado: req.body.estado, fecha: fechaHoy, detalle: req.body.detalle || `Estado actualizado a "${req.body.estado}".` }
     ];
   }
-  pqrs[idx] = actualizado;
-  res.json({ data: actualizado });
+  pqrs = pqrs.map(p => (p === item ? actualizado : p));
+  res.json({ data: aPqrs(actualizado) });
 });
 
 app.delete('/api/feedback/:id', async (req, res) => {
   await delay();
-  const idx = pqrs.findIndex(p => p.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'PQRS no encontrada' });
-  pqrs = pqrs.filter(p => p.id !== req.params.id);
+  const item = buscarPqrs(req.params.id);
+  if (!item) return res.status(404).json({ error: 'PQRS no encontrada' });
+  pqrs = pqrs.filter(p => p !== item);
   res.json({ data: { success: true } });
 });
 
@@ -375,34 +553,37 @@ app.delete('/api/feedback/:id', async (req, res) => {
 // ==========================================
 app.get('/api/resources', async (req, res) => {
   await delay();
-  res.json({ data: recursos });
+  res.json({ data: recursos.map(aRecurso) });
 });
 
 app.get('/api/resources/:id', async (req, res) => {
   await delay();
-  const item = recursos.find(r => r.id === req.params.id);
+  const item = buscarRecurso(req.params.id);
   if (!item) return res.status(404).json({ error: 'Recurso no encontrado' });
-  res.json({ data: item });
+  res.json({ data: aRecurso(item) });
 });
 
 app.post('/api/resources', async (req, res) => {
   await delay();
   const nuevo = { id: `R-${Date.now()}`, ...req.body };
   recursos = [...recursos, nuevo];
-  res.status(201).json({ data: nuevo });
+  res.status(201).json({ data: aRecurso(nuevo) });
 });
 
 app.put('/api/resources/:id', async (req, res) => {
   await delay();
-  const idx = recursos.findIndex(r => r.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Recurso no encontrado' });
-  recursos[idx] = { ...recursos[idx], ...req.body };
-  res.json({ data: recursos[idx] });
+  const item = buscarRecurso(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Recurso no encontrado' });
+  const actualizado = { ...item, ...req.body };
+  recursos = recursos.map(r => (r === item ? actualizado : r));
+  res.json({ data: aRecurso(actualizado) });
 });
 
 app.delete('/api/resources/:id', async (req, res) => {
   await delay();
-  recursos = recursos.filter(r => r.id !== req.params.id);
+  const item = buscarRecurso(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Recurso no encontrado' });
+  recursos = recursos.filter(r => r !== item);
   res.json({ data: { success: true } });
 });
 
@@ -411,12 +592,39 @@ app.delete('/api/resources/:id', async (req, res) => {
 // ==========================================
 app.get('/api/reservations', async (req, res) => {
   await delay();
-  res.json({ data: RESERVAS });
+  res.json({ data: reservas });
 });
 
 app.post('/api/reservations', async (req, res) => {
   await delay();
-  res.status(201).json({ data: { success: true, message: 'Reserva registrada correctamente.' } });
+  const recurso = buscarRecurso(req.body.id_recurso) || {};
+  const nueva = {
+    id_reserva: Date.now(),
+    estado: "Confirmada",
+    ...req.body,
+    usuario_nombre: req.body.usuario_nombre || "Usuario",
+    nombre_recurso: req.body.nombre_recurso || recurso.nombre || recurso.nombre_recurso || "",
+    tipo_recurso: req.body.tipo_recurso || recurso.tipo || recurso.tipo_recurso || ""
+  };
+  reservas = [nueva, ...reservas];
+  res.status(201).json({ data: nueva });
+});
+
+app.put('/api/reservations/:id', async (req, res) => {
+  await delay();
+  const item = buscarReserva(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Reserva no encontrada' });
+  const actualizada = { ...item, ...req.body };
+  reservas = reservas.map(r => (r === item ? actualizada : r));
+  res.json({ data: actualizada });
+});
+
+app.delete('/api/reservations/:id', async (req, res) => {
+  await delay();
+  const item = buscarReserva(req.params.id);
+  if (!item) return res.status(404).json({ error: 'Reserva no encontrada' });
+  reservas = reservas.filter(r => r !== item);
+  res.json({ data: { success: true } });
 });
 
 // ==========================================
@@ -480,13 +688,13 @@ app.get('/api/reports', async (req, res) => {
       usuariosPorRol: contar(USERS, "rol", ROLES.map(r => r.nombre)),
       recursosPorTipo: contar(recursos, "tipo", ["Salas","Laboratorios","Auditorios","Equipos"]),
       eventosPorCategoria: contar(eventos, "categoria", ["Académico","Cultural","Formación","Institucional"]),
-      reservasPorEstado: contar(RESERVAS, "estado", ["Confirmada","Pendiente","Cancelada"]),
+      reservasPorEstado: contar(reservas, "estado", ["Confirmada","Pendiente","Cancelada"]),
       pqrsPorTipo: contar(pqrs, "tipo", ["Petición","Queja","Reclamo","Sugerencia"]),
-      masUtilizados: contarPor(RESERVAS, "recurso").slice(0, 5),
+      masUtilizados: contarPor(reservas, "nombre_recurso").slice(0, 5),
       serviciosDisponibles: SERVICIOS.length,
       totales: {
         solicitudes: solicitudes.length,
-        reservas: RESERVAS.length,
+        reservas: reservas.length,
         recursos: recursos.length,
         usuarios: USERS.length,
         pqrs: pqrs.length,
