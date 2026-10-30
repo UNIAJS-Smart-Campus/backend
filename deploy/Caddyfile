@@ -1,0 +1,13 @@
+{$API_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Caddy reenvía /api y /socket.io; el upgrade WebSocket es automático.
+	reverse_proxy gateway:3000
+}

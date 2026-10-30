@@ -72,3 +72,15 @@ Los puertos locales se pueden cambiar sin editar el compose:
 ## Documentación
 
 Ver `docs/IMPLEMENTACION_BACKEND.md` para la guía paso a paso.
+Para producción (VPS + Docker + Caddy + Vercel): [`deploy/README.md`](deploy/README.md).
+
+## Producción
+
+El stack de producción está en `docker-compose.prod.yml`:
+
+```bash
+cp .env.prod.example .env.prod   # completar dominio, claves y CORS
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+Solo Caddy publica 80/443; MySQL y Elasticsearch quedan en la red interna.

@@ -1,0 +1,410 @@
+name: uajs-prod
+
+# Stack de producción para el backend.
+# Uso:
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#
+# Solo Caddy publica puertos (80/443). MySQL, Elasticsearch y los servicios
+# quedan en la red interna; no se publican a Internet.
+
+services:
+  # =========================================================
+  # BASE DE DATOS
+  # =========================================================
+  mysql:
+    image: mysql:8.0
+    container_name: uajs-prod-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # El cliente mysql/mysqladmin lo usa para autenticarse como root.
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD}
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./uajs_smart_campus.sql:/docker-entrypoint-initdb.d/uajs_smart_campus.sql:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+    networks:
+      - internal
+
+  db-init:
+    image: mysql:8.0
+    container_name: uajs-prod-db-init
+    restart: "no"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD}
+      DB_RESET: ${DB_RESET:-0}
+
+    volumes:
+      - ./uajs_smart_campus.sql:/sql/uajs_smart_campus.sql:ro
+
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        echo "Esperando a MySQL..."
+        until mysqladmin ping -h mysql -uroot --silent; do sleep 2; done
+
+        # Si la tabla usuarios existe y no se pidio DB_RESET=1, no se toca nada.
+        if mysql -h mysql -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${MYSQL_DATABASE}' AND table_name='usuarios'" | grep -qx 1 \
+           && ! env | grep -qx 'DB_RESET=1'; then
+          echo "Base de datos ya desplegada: se conserva la informacion existente."
+          exit 0
+        fi
+
+        echo "Creando/recreando la base ${MYSQL_DATABASE}..."
+        mysql -h mysql -uroot -e "DROP DATABASE IF EXISTS ${MYSQL_DATABASE}; CREATE DATABASE ${MYSQL_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+
+        echo "Importando uajs_smart_campus.sql..."
+        mysql -h mysql -uroot "${MYSQL_DATABASE}" < /sql/uajs_smart_campus.sql
+        echo "Base de datos desplegada correctamente."
+
+    networks:
+      - internal
+
+  # =========================================================
+  # BUSQUEDA
+  # =========================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    container_name: uajs-prod-elasticsearch
+    restart: unless-stopped
+
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=${ES_JAVA_OPTS:--Xms512m -Xmx512m}"
+
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+    networks:
+      - internal
+
+  # =========================================================
+  # MICROSERVICIOS
+  # =========================================================
+  auth-service:
+    build: ./services/auth-service
+    container_name: uajs-prod-auth
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      AUTH_SERVICE_PORT: "3001"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES: ${JWT_EXPIRES:-24h}
+      FRONT_URL: ${FRONT_URL}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  users-service:
+    build: ./services/users-service
+    container_name: uajs-prod-users
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      USERS_SERVICE_PORT: "3002"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  events-service:
+    build: ./services/events-service
+    container_name: uajs-prod-events
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      EVENTS_SERVICE_PORT: "3003"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  reservations-service:
+    build: ./services/reservations-service
+    container_name: uajs-prod-reservations
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      RESERVATIONS_SERVICE_PORT: "3004"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  notifications-service:
+    build: ./services/notifications-service
+    container_name: uajs-prod-notifications
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NOTIFICATIONS_SERVICE_PORT: "3005"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      JWT_SECRET: ${JWT_SECRET}
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  requests-service:
+    build: ./services/requests-service
+    container_name: uajs-prod-requests
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      REQUESTS_SERVICE_PORT: "3006"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  resources-service:
+    build: ./services/resources-service
+    container_name: uajs-prod-resources
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      RESOURCES_SERVICE_PORT: "3007"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  feedback-service:
+    build: ./services/feedback-service
+    container_name: uajs-prod-feedback
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      FEEDBACK_SERVICE_PORT: "3008"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  academic-info-service:
+    build: ./services/academic-info-service
+    container_name: uajs-prod-academic-info
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      INFO_ACADEMICA_SERVICE_PORT: "3009"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  configuration-service:
+    build: ./services/configuration-service
+    container_name: uajs-prod-configuration
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      CONFIGURACION_SERVICE_PORT: "3010"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+
+  search-service:
+    build: ./services/search-service
+    container_name: uajs-prod-search
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SEARCH_SERVICE_PORT: "3011"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: ${MYSQL_DATABASE}
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+      SEARCH_REINDEX_INTERVAL_MS: ${SEARCH_REINDEX_INTERVAL_MS:-0}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # =========================================================
+  # API GATEWAY
+  # =========================================================
+  gateway:
+    build: ./gateway
+    container_name: uajs-prod-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      GATEWAY_PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES: ${JWT_EXPIRES:-24h}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      SEARCH_SERVICE_URL: http://search-service:3011
+      SEARCH_REINDEX_DEBOUNCE_MS: ${SEARCH_REINDEX_DEBOUNCE_MS:-3000}
+      SEARCH_REINDEX_TIMEOUT_MS: ${SEARCH_REINDEX_TIMEOUT_MS:-15000}
+    depends_on:
+      auth-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+      events-service:
+        condition: service_started
+      reservations-service:
+        condition: service_started
+      notifications-service:
+        condition: service_started
+      requests-service:
+        condition: service_started
+      resources-service:
+        condition: service_started
+      feedback-service:
+        condition: service_started
+      academic-info-service:
+        condition: service_started
+      configuration-service:
+        condition: service_started
+      search-service:
+        condition: service_started
+    expose:
+      - "3000"
+    networks:
+      - internal
+
+  # =========================================================
+  # HTTPS / REVERSE PROXY
+  # =========================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: uajs-prod-caddy
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+    depends_on:
+      gateway:
+        condition: service_started
+
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  elasticsearch_data:
+  caddy_data:
+  caddy_config:
