@@ -75,12 +75,11 @@ CREATE TABLE `eventos_y_actividades` (
   `hora_inicio` time NOT NULL,
   `hora_fin` time NOT NULL,
   `ubicacion` varchar(120) NOT NULL,
-  `tipo_evento` enum('Académico','Cultural','Deportivo','Formación','Institucional') NOT NULL,
+  `tipo_evento` enum('Académico','Cultural','Deportivo','Formación') NOT NULL,
   `estado` varchar(30) NOT NULL DEFAULT 'Programado',
   `id_usuario` int DEFAULT NULL,
   `cupo` int DEFAULT '0',
   `inscritos` int DEFAULT '0',
-  `participantes` json DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -264,7 +263,6 @@ CREATE TABLE `pqrs` (
   `fecha` date NOT NULL,
   `estado` varchar(30) NOT NULL DEFAULT 'Abierta',
   `descripcion` text NOT NULL,
-  `solicitante` varchar(120) NOT NULL DEFAULT '',
   `respuesta` text,
   `fecha_respuesta` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -280,8 +278,7 @@ CREATE TABLE `pqrs` (
   `correo` varchar(120) NOT NULL DEFAULT '',
   `prioridad` varchar(20) NOT NULL DEFAULT 'Media',
   `asignado_a` varchar(120) NOT NULL DEFAULT '',
-  `adjunto` varchar(255) DEFAULT NULL,
-  `historial` json DEFAULT NULL
+  `adjunto` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
@@ -441,7 +438,6 @@ CREATE TABLE `solicitudes` (
   `solicitante` varchar(120) DEFAULT '',
   `estado` varchar(20) NOT NULL DEFAULT 'REGISTRADA',
   `respuesta` text,
-  `historial` json DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -494,25 +490,25 @@ CREATE TABLE `usuarios` (
 
 INSERT INTO `usuarios` (`id_usuario`, `identificacion`, `usuario`, `cedula`, `contraseña`, `nombre`, `apellido`, `correo`, `telefono`, `id_rol`, `tipo_usuario`, `programa`, `cargo`, `campus`, `foto_perfil`, `estado`, `created_at`, `updated_at`, `reset_token`, `reset_expira`) VALUES
 (1, 'admin', 'admin', '1023456789', '$2a$10$mY6PGsh03VzUqdqUv2dOsuKfb0BB6E5VRw1lBXdPA.Omo5u1HPRja', 'Natalia', 'Rodríguez', 'natalia.rodriguez@uajs.edu.co', '3001234501', 1, 'Administrador', 'Dirección Académica', 'Coordinadora general', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=NR', 'Activo', '2026-09-30 23:00:40', '2026-10-21 23:19:42', NULL, NULL),
-(2, 'funcionario', 'funcionario', '1023456788', '$2b$10$0xd66BZ.LmIpfMtA2lwgYORJ6zN77loShn9bbzoM14ethQ8K/LUl.', 'Carlos', 'Méndez', 'carlos.mendez@uajs.edu.co', '3001234502', 4, 'Administrativo', 'Bienestar Universitario', 'Analista de servicios', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=CM', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(3, 'profesor', 'profesor', '1023456787', '$2b$10$eTSIfdRx9JvoMQqpeaEk.uMoZMtPiRaW9p6EJLfPCl2I2H8cYMXd.', 'Laura', 'Gómez', 'laura.gomez@uajs.edu.co', '3001234503', 3, 'Docente', 'Matemáticas', 'Docente titular', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=LG', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(4, 'estudiante', 'estudiante', '1023456786', '$2b$10$9PhdDHIrhjAC.4AzuA2Npuyp69sIYhTd5JTeFVfAn5FF00Jx2.Ktq', 'Andrés', 'Torres', 'andres.torres@uajs.edu.co', '3001234504', 2, 'Estudiante', 'Ingeniería de Sistemas', 'Estudiante', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=AT', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(5, 'docente2', 'docente2', '1023456785', '$2b$10$/./s5cPZlUM/Dn2p6l/ZGO1I4b89oB14WCDYq.dGPaIpbDOSIcQtO', 'María Fernanda', 'Cárdenas', 'mf.cardenas@uajs.edu.co', '3001234505', 3, 'Docente', 'Ingeniería de Software', 'Profesora de proyectos', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=MC', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(6, 'estudiante2', 'estudiante2', '1023456784', '$2b$10$ggWijrvImYiutiWGQsoIDOeg7UYPXmIuGHQOAMPleCM0OrJUJvdwe', 'Valentina', 'Morales', 'valentina.morales@uajs.edu.co', '3001234506', 2, 'Estudiante', 'Administración de Empresas', 'Estudiante', 'Campus occidente', 'https://api.dicebear.com/7.x/initials/svg?seed=VM', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(7, 'admin2', 'admin2', '1023456783', '$2b$10$ZMBrdGNZlUQ3zjIpxN5EpuwuxKaVO.1HhTY4eWgPwwflnXecELTPW', 'Javier', 'Álvarez', 'javier.alvarez@uajs.edu.co', '3001234507', 1, 'Administrador', 'Tecnología e innovación', 'Director de operación', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=JA', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(8, 'admvo', 'admvo', '1023456782', '$2b$10$K5xCFspjxugRZ9t5PqH3C.VOkKVurobC8mZWKA0HZzV8RDdiAK3Ei', 'Sofía', 'Jiménez', 'sofia.jimenez@uajs.edu.co', '3001234508', 4, 'Administrativo', 'Servicios estudiantiles', 'Coordinadora administrativa', 'Campus centro', 'https://api.dicebear.com/7.x/initials/svg?seed=SJ', 'Inactivo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(9, 'docente3', 'docente3', '1023456781', '$2b$10$HGZSfXjUjLQfflE7OAY0e.62hNPYSSEAwOy/Cn1Dy/.hqij.5mfOW', 'Ricardo', 'Torres', 'ricardo.torres@uajs.edu.co', '3001234509', 3, 'Docente', 'Física', 'Docente de laboratorio', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=RT', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(10, 'estudiante3', 'estudiante3', '1023456780', '$2b$10$Scwvrt3iuFP5v8D2n0HOWONBRMYzyKMGBedoZbUuRa.ivzZraX8Zm', 'Isabella', 'Ramírez', 'isabella.ramirez@uajs.edu.co', '3001234510', 2, 'Estudiante', 'Ingeniería Civil', 'Estudiante', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=IR', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(11, 'admin3', 'admin3', '1023456779', '$2b$10$JqJ7zx.og7gz0nfD3vNwOOEPzeRr0mR0dx/alBPtJ6IasBfN3O2Tu', 'Andrés', 'Gutiérrez', 'andres.gutierrez@uajs.edu.co', '3001234511', 1, 'Administrador', 'Tecnologías de la información', 'Director de sistemas', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=AG', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(12, 'admvo2', 'admvo2', '1023456778', '$2b$10$zcNHmbV3hIp9QWzcAfNJjedp0qLHDNSaBlyEFbMiQlolXI3W6iWHi', 'Paula', 'Vargas', 'paula.vargas@uajs.edu.co', '3001234512', 4, 'Administrativo', 'Recursos Humanos', 'Analista de talento humano', 'Campus occidente', 'https://api.dicebear.com/7.x/initials/svg?seed=PV', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(13, 'docente4', 'docente4', '1023456777', '$2b$10$yDtqeMqPAMXfsuwHGoeSuecY7.jZI7BgunM8X04MjIaSE59yDtc7G', 'Fernando', 'Castillo', 'fernando.castillo@uajs.edu.co', '3001234513', 3, 'Docente', 'Economía', 'Docente titular', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=FC', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(14, 'estudiante4', 'estudiante4', '1023456776', '$2b$10$f1XEQJfMdka6/jwR1FGuYeyIrcgJmBP/lPT2YzUCMeH9qUcELaTIS', 'Camila', 'Herrera', 'camila.herrera@uajs.edu.co', '3001234514', 2, 'Estudiante', 'Derecho', 'Estudiante', 'Campus centro', 'https://api.dicebear.com/7.x/initials/svg?seed=CH', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(15, 'admin4', 'admin4', '1023456775', '$2b$10$CARolFuz.Z4QtCO7KRmuO.Lm1.uyT8cmQ6DRYuBZBuj075On9xlx.', 'Luisa', 'Cardona', 'luisa.cardona@uajs.edu.co', '3001234515', 1, 'Administrador', 'Administración', 'Rectora', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=LC', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(16, 'docente5', 'docente5', '1023456774', '$2b$10$.X8lPrniPyF92M5CJu2D2eU/0wwTbAv4WiOdPTGwHKsLNSxxovnQa', 'Sebastián', 'Rojas', 'sebastian.rojas@uajs.edu.co', '3001234516', 3, 'Docente', 'Idiomas', 'Docente de inglés', 'Campus occidente', 'https://api.dicebear.com/7.x/initials/svg?seed=SR', 'Inactivo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(17, 'estudiante5', 'estudiante5', '1023456773', '$2b$10$spzAFQi1EgNrRuYn3wsIN.yMdskol3uk1pPeuEMs044OwBVMSShOW', 'Daniela', 'Ortiz', 'daniela.ortiz@uajs.edu.co', '3001234517', 2, 'Estudiante', 'Psicología', 'Estudiante', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=DO', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
-(18, 'docente6', 'docente6', '1023456772', '$2b$10$QDihPhHNRhbWwzqVHk/mYOf8ExUayC3DyVwX0xrywsjGSQzn21uhu', 'Oscar', 'Navas', 'oscar.navas@uajs.edu.co', '3001234518', 3, 'Docente', 'Ingeniería Industrial', 'Coordinador de laboratorio', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=ON', 'Activo', '2026-10-17 04:59:51', '2026-10-17 04:59:51', NULL, NULL),
-(19, 'estudiante6', 'estudiante6', '1023456771', '$2b$10$so1Tes5WXnxzJjcc2ocoZ.aQ7uHuVElM64scKguSWYc2pWnAYg/5K', 'Mateo', 'Rengifo', 'mateo.rengifo@uajs.edu.co', '3001234519', 2, 'Estudiante', 'Administración de Empresas', 'Estudiante', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=MR', 'Activo', '2026-10-17 04:59:51', '2026-10-17 04:59:51', NULL, NULL),
-(20, 'estudiante7', 'estudiante7', '1023456770', '$2b$10$XEvWMbDYCicNAeo8xBIZOuYUyK7FGV0U1I3gniR.e07n9eLpZwIqK', 'Catalina', 'Salinas', 'catalina.salinas@uajs.edu.co', '3001234520', 2, 'Estudiante', 'Ingeniería de Sistemas', 'Estudiante', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=CS', 'Activo', '2026-10-17 04:59:51', '2026-10-17 04:59:51', NULL, NULL);
+(2, 'funcionario', 'funcionario', '1023456788', '$2a$10$9fgVu77PaTuSlzFWKr9ik.b5g03NrfRvg/vZa6Da8.8CX7Vnltq4.', 'Carlos', 'Méndez', 'carlos.mendez@uajs.edu.co', '3001234502', 4, 'Administrativo', 'Bienestar Universitario', 'Analista de servicios', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=CM', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(3, 'profesor', 'profesor', '1023456787', '$2a$10$ALs9jxa9z32BIRHed8jiDO/obj9OrDbClbWhtgWz8yY6npCPLWVrq', 'Laura', 'Gómez', 'laura.gomez@uajs.edu.co', '3001234503', 3, 'Docente', 'Matemáticas', 'Docente titular', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=LG', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(4, 'estudiante', 'estudiante', '1023456786', '$2a$10$VbG/.T2TsZGMyMg/34UzZeXNtB.7XeB6P2p107/tbO1u8JDUR6dDC', 'Andrés', 'Torres', 'andres.torres@uajs.edu.co', '3001234504', 2, 'Estudiante', 'Ingeniería de Sistemas', 'Estudiante', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=AT', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(5, 'docente2', 'docente2', '1023456785', '$2a$10$l.Z9jghtpa13fz/E1BtfjeRqu2m2wVK5xFPbZ59nh.ur6NYBQjpve', 'María Fernanda', 'Cárdenas', 'mf.cardenas@uajs.edu.co', '3001234505', 3, 'Docente', 'Ingeniería de Software', 'Profesora de proyectos', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=MC', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(6, 'estudiante2', 'estudiante2', '1023456784', '$2a$10$fCKYuve6ZQcP8hucbctCs.mCgvMLUKH5srBBc7RQF1VMkFfpFW06e', 'Valentina', 'Morales', 'valentina.morales@uajs.edu.co', '3001234506', 2, 'Estudiante', 'Administración de Empresas', 'Estudiante', 'Campus occidente', 'https://api.dicebear.com/7.x/initials/svg?seed=VM', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(7, 'admin2', 'admin2', '1023456783', '$2a$10$l6PrNze2Ry094WES5SJ4E./sqrM6e7cy2rSF3FlaBESKzR0AAWsqi', 'Javier', 'Álvarez', 'javier.alvarez@uajs.edu.co', '3001234507', 1, 'Administrador', 'Tecnología e innovación', 'Director de operación', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=JA', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(8, 'admvo', 'admvo', '1023456782', '$2a$10$vRy7kVucI.7A4yqbaB8M0O4BOL8Jyz6SJSIrJtVFtbz17sdsdaQ2e', 'Sofía', 'Jiménez', 'sofia.jimenez@uajs.edu.co', '3001234508', 4, 'Administrativo', 'Servicios estudiantiles', 'Coordinadora administrativa', 'Campus centro', 'https://api.dicebear.com/7.x/initials/svg?seed=SJ', 'Inactivo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(9, 'docente3', 'docente3', '1023456781', '$2a$10$CSaC7ltDjgZIk7BwD5N3u.MmMLLUzstXG9H0l6yEG2FTNwpUmEnTK', 'Ricardo', 'Torres', 'ricardo.torres@uajs.edu.co', '3001234509', 3, 'Docente', 'Física', 'Docente de laboratorio', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=RT', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(10, 'estudiante3', 'estudiante3', '1023456780', '$2a$10$LKpt8VnyQMh7ix9uOd5Zye6b.XqyEv8eeppSIoW7kchLpeyY/ENpW', 'Isabella', 'Ramírez', 'isabella.ramirez@uajs.edu.co', '3001234510', 2, 'Estudiante', 'Ingeniería Civil', 'Estudiante', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=IR', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(11, 'admin3', 'admin3', '1023456779', '$2a$10$utWv1Y55xwOMX5CJCTFQP.q4CYkIdLhEFypsHhdcoS45yRDmzHnEi', 'Andrés', 'Gutiérrez', 'andres.gutierrez@uajs.edu.co', '3001234511', 1, 'Administrador', 'Tecnologías de la información', 'Director de sistemas', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=AG', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(12, 'admvo2', 'admvo2', '1023456778', '$2a$10$CDUWs8uAauYtvoftxWN7YecZXkxoPoKiqGJmDLOdHfqOytPK6PGvS', 'Paula', 'Vargas', 'paula.vargas@uajs.edu.co', '3001234512', 4, 'Administrativo', 'Recursos Humanos', 'Analista de talento humano', 'Campus occidente', 'https://api.dicebear.com/7.x/initials/svg?seed=PV', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(13, 'docente4', 'docente4', '1023456777', '$2a$10$DVhdP.prFf3Wp2Zr1nukbOGVT6dymZgTkWNrI52tKSrn6h1jQZiZm', 'Fernando', 'Castillo', 'fernando.castillo@uajs.edu.co', '3001234513', 3, 'Docente', 'Economía', 'Docente titular', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=FC', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(14, 'estudiante4', 'estudiante4', '1023456776', '$2a$10$i1cPtgf0IEsySTN2bi5D0.VA9/VS/p4bN9hbCjsiV2VxlqcaHWb62', 'Camila', 'Herrera', 'camila.herrera@uajs.edu.co', '3001234514', 2, 'Estudiante', 'Derecho', 'Estudiante', 'Campus centro', 'https://api.dicebear.com/7.x/initials/svg?seed=CH', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(15, 'admin4', 'admin4', '1023456775', '$2a$10$ctnulr4nQ8Yy9FcYBpHEf.W34Ip6EjygJhqRHR7QTqaeG2AlP2S3y', 'Luisa', 'Cardona', 'luisa.cardona@uajs.edu.co', '3001234515', 1, 'Administrador', 'Administración', 'Rectora', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=LC', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(16, 'docente5', 'docente5', '1023456774', '$2a$10$d5N62DuUU6DQtRK3PwYTKukID.39yoVO2HgJFOIYxMgDtyYY84s0G', 'Sebastián', 'Rojas', 'sebastian.rojas@uajs.edu.co', '3001234516', 3, 'Docente', 'Idiomas', 'Docente de inglés', 'Campus occidente', 'https://api.dicebear.com/7.x/initials/svg?seed=SR', 'Inactivo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(17, 'estudiante5', 'estudiante5', '1023456773', '$2a$10$QYqV4XXYD23oJEh9bD.q5.mPOgsLmJXrlNjFIuEArfJ21Z9hWl2Sq', 'Daniela', 'Ortiz', 'daniela.ortiz@uajs.edu.co', '3001234517', 2, 'Estudiante', 'Psicología', 'Estudiante', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=DO', 'Activo', '2026-09-30 23:00:40', '2026-10-17 03:19:37', NULL, NULL),
+(18, 'docente6', 'docente6', '1023456772', '$2a$10$VjywtUqOROFOiDorApGE1e1cy0PxjE9JSRZLdHEzrnpx/PpISA.2y', 'Oscar', 'Navas', 'oscar.navas@uajs.edu.co', '3001234518', 3, 'Docente', 'Ingeniería Industrial', 'Coordinador de laboratorio', 'Campus principal', 'https://api.dicebear.com/7.x/initials/svg?seed=ON', 'Activo', '2026-10-17 04:59:51', '2026-10-17 04:59:51', NULL, NULL),
+(19, 'estudiante6', 'estudiante6', '1023456771', '$2a$10$ixiCySXtVA0TPhGvJCyvt.Kxpx/kkyGO3o/KDpG6DdF/CY7GFKrZe', 'Mateo', 'Rengifo', 'mateo.rengifo@uajs.edu.co', '3001234519', 2, 'Estudiante', 'Administración de Empresas', 'Estudiante', 'Campus central', 'https://api.dicebear.com/7.x/initials/svg?seed=MR', 'Activo', '2026-10-17 04:59:51', '2026-10-17 04:59:51', NULL, NULL),
+(20, 'estudiante7', 'estudiante7', '1023456770', '$2a$10$xzLdU0tN8FxCFfPxsa8ym.69Z8QpEZznE/AJDgZpv8iBpLoLnS2jS', 'Catalina', 'Salinas', 'catalina.salinas@uajs.edu.co', '3001234520', 2, 'Estudiante', 'Ingeniería de Sistemas', 'Estudiante', 'Campus Norte', 'https://api.dicebear.com/7.x/initials/svg?seed=CS', 'Activo', '2026-10-17 04:59:51', '2026-10-17 04:59:51', NULL, NULL);
 
 -- --------------------------------------------------------
 
