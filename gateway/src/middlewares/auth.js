@@ -31,7 +31,9 @@ function authMiddleware(req, res, next) {
     }
 
     try {
-        req.user = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+        req.user = jwt.verify(authHeader.split(' ')[1], JWT_SECRET, {
+            algorithms: ['HS256']
+        });
         next();
     } catch (error) {
         const mensaje =

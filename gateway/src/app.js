@@ -11,7 +11,33 @@ const reindexadoMiddleware = require('./middlewares/reindexado');
 
 const app = express();
 
-app.use(cors());
+// Detrás de nginx/Vercel/el proxy de Docker, la IP real llega en
+// X-Forwarded-For. Sin esto, el rate limit contaría a todos como la misma IP.
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
+// CORS restringido: solo los orígenes configurados (coma-separados).
+// En producción hay que definir CORS_ORIGINS con el dominio del frontend.
+const ORIGENES_PERMITIDOS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:4173')
+	.split(',')
+	.map((origen) => origen.trim())
+	.filter(Boolean);
+
+app.use(cors({
+	origin: (origin, callback) => callback(null, !origin || ORIGENES_PERMITIDOS.includes(origin)),
+	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+	allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// El cliente nunca puede dictar su identidad: el gateway la escribe después
+// de verificar el JWT. Se eliminan también los alias en español usados antes.
+app.use((req, res, next) => {
+	delete req.headers['x-user-id'];
+	delete req.headers['x-user-role'];
+	delete req.headers['x-user-rol'];
+	delete req.headers['x-user-identificacion'];
+	next();
+});
 
 app.get('/', (req, res) => {
 	res.json({
@@ -30,7 +56,9 @@ const proxyFor = (service, prefix) => createProxyMiddleware({
 			const user = req.user;
 			if (user) {
 				proxyReq.setHeader('x-user-id', String(user.id));
-				proxyReq.setHeader('x-user-rol', String(user.rol));
+				// Los servicios leen `x-user-role` (en inglés); antes se enviaba
+				// `x-user-rol` y el rol llegaba vacío a todos los microservicios.
+				proxyReq.setHeader('x-user-role', String(user.rol));
 				proxyReq.setHeader('x-user-identificacion', user.identificacion || '');
 			}
 		}
