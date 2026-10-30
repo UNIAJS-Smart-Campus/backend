@@ -212,6 +212,14 @@ const RESERVAS = [
   { id_reserva: 6, id_usuario: 6, id_recurso: "R-007", usuario_nombre: "Andrés Ruiz", nombre_recurso: "Video proyector Epson 4K", tipo_recurso: "Equipos", fecha_reserva: "2026-09-15", hora_inicio: "13:00", hora_fin: "15:00", motivo: "Feria de empleabilidad", observaciones: "", estado: "Pendiente" }
 ];
 
+const PUBLICACIONES = [
+  { id_publicacion: 1, titulo: "Convocatoria periodo académico 2026-1", categoria: "Convocatoria", fecha: "2026-03-15", autor: "Laura Gómez", contenido: "Se abre el periodo de inscripción para el primer semestre 2026. Los estudiantes deberán completar su matrícula antes del 28 de marzo.", estado: "Aprobada", id_usuario: 3, usuario_nombre: "Laura Gómez", programa: "Toda la comunidad", tipo_vigencia: "Hasta", vigencia: "2026-03-28", destacado: 1 },
+  { id_publicacion: 2, titulo: "Taller de Metodología de Investigación", categoria: "Taller", fecha: "2026-04-10", autor: "Laura Gómez", contenido: "Se realizará un taller práctico sobre métodos de investigación cuantitativa y cualitativa para estudiantes de posgrado.", estado: "Aprobada", id_usuario: 3, usuario_nombre: "Laura Gómez", programa: "Matemáticas", tipo_vigencia: "Hasta", vigencia: "2026-04-25", destacado: 0 },
+  { id_publicacion: 3, titulo: "Resultados parciales Cálculo I", categoria: "Resultado", fecha: "2026-04-22", autor: "Laura Gómez", contenido: "Se publican los resultados del primer parcial de Cálculo I. Los estudiantes pueden revisar en la plataforma académica.", estado: "Aprobada", id_usuario: 3, usuario_nombre: "Laura Gómez", programa: "Ingeniería de Sistemas", tipo_vigencia: "Permanente", vigencia: null, destacado: 0 },
+  { id_publicacion: 4, titulo: "Aviso: mantenimiento plataforma académica", categoria: "Aviso académico", fecha: "2026-04-28", autor: "Carlos Méndez", contenido: "La plataforma académica tendrá mantenimiento programado el próximo sábado. El servicio no estará disponible entre las 8:00 y las 12:00.", estado: "Pendiente", id_usuario: 2, usuario_nombre: "Carlos Méndez", programa: "Toda la comunidad", tipo_vigencia: "Hasta", vigencia: "2026-05-02", destacado: 0 },
+  { id_publicacion: 5, titulo: "Seminario de investigación aplicada", categoria: "Seminario", fecha: "2026-05-06", autor: "Lucía Paredes", contenido: "Presentación de proyectos de investigación y resultados de trabajo de grado del programa de Ingeniería de Sistemas.", estado: "Aprobada", id_usuario: 5, usuario_nombre: "Lucía Paredes", programa: "Ingeniería de Sistemas", tipo_vigencia: "Permanente", vigencia: null, destacado: 1 }
+];
+
 const SERVICIOS = [
   { name: "Solicitudes", icon: "solicitudes", category: "Académico", path: "/solicitudes", description: "Gestiona trámites académicos y servicios institucionales del Smart Campus UNIAJS.", resources: ["Constancias académicas","Certificados de estudio","Cambio de programa","Homologaciones"], options: ["Crear nueva solicitud","Consultar estado de una solicitud","Seguimiento de la evolución"] },
   { name: "Reservas", icon: "reservas", category: "Infraestructura", path: "/reservas", description: "Consulta y reserva espacios, aulas, laboratorios y equipos del campus inteligente.", resources: ["Salones de clase","Laboratorios de informática","Auditorios","Equipos audiovisuales"], options: ["Seleccionar recurso","Consultar disponibilidad","Registrar reserva"] },
@@ -228,6 +236,8 @@ let notificaciones = [...NOTIFICACIONES];
 let pqrs = [...PQRS];
 let recursos = [...RECURSOS];
 let reservas = [...RESERVAS];
+let publicaciones = [...PUBLICACIONES];
+let configuracion = [];
 
 // Búsquedas tolerantes: el frontend puede enviar el id interno o el de BD.
 const buscarSolicitud = (id) =>
@@ -625,6 +635,155 @@ app.delete('/api/reservations/:id', async (req, res) => {
   if (!item) return res.status(404).json({ error: 'Reserva no encontrada' });
   reservas = reservas.filter(r => r !== item);
   res.json({ data: { success: true } });
+});
+
+// ==========================================
+// INFORMACIÓN ACADÉMICA (ACADEMIC INFO)
+// ==========================================
+app.get('/api/academic-info', async (req, res) => {
+  await delay();
+  res.json({ data: publicaciones });
+});
+
+app.get('/api/academic-info/:id', async (req, res) => {
+  await delay();
+  const item = publicaciones.find(p => String(p.id_publicacion) === String(req.params.id));
+  if (!item) return res.status(404).json({ error: 'Publicación no encontrada' });
+  res.json({ data: item });
+});
+
+app.post('/api/academic-info', async (req, res) => {
+  await delay();
+  const nueva = {
+    id_publicacion: Date.now(),
+    estado: "Publicado",
+    destacado: 0,
+    ...req.body
+  };
+  nueva.usuario_nombre = nueva.usuario_nombre || nueva.autor || "";
+  nueva.destacado = Number(nueva.destacado) ? 1 : 0;
+  publicaciones = [nueva, ...publicaciones];
+  res.status(201).json({ data: nueva });
+});
+
+app.put('/api/academic-info/:id', async (req, res) => {
+  await delay();
+  const item = publicaciones.find(p => String(p.id_publicacion) === String(req.params.id));
+  if (!item) return res.status(404).json({ error: 'Publicación no encontrada' });
+  const actualizada = { ...item, ...req.body, id_publicacion: item.id_publicacion };
+  actualizada.usuario_nombre = actualizada.usuario_nombre || actualizada.autor || "";
+  actualizada.destacado = Number(actualizada.destacado) ? 1 : 0;
+  publicaciones = publicaciones.map(p => (p === item ? actualizada : p));
+  res.json({ data: actualizada });
+});
+
+app.delete('/api/academic-info/:id', async (req, res) => {
+  await delay();
+  const item = publicaciones.find(p => String(p.id_publicacion) === String(req.params.id));
+  if (!item) return res.status(404).json({ error: 'Publicación no encontrada' });
+  publicaciones = publicaciones.filter(p => p !== item);
+  res.json({ data: { success: true } });
+});
+
+// ==========================================
+// CONFIGURACIÓN (CONFIGURATION)
+// ==========================================
+app.get('/api/configuration', async (req, res) => {
+  await delay();
+  const idUsuario = req.query.id_usuario;
+  const lista = idUsuario
+    ? configuracion.filter(c => String(c.id_usuario) === String(idUsuario))
+    : configuracion;
+  res.json({ data: lista });
+});
+
+app.get('/api/configuration/usuario/:idUsuario/seccion/:seccion', async (req, res) => {
+  await delay();
+  const item = configuracion.find(
+    c => String(c.id_usuario) === String(req.params.idUsuario) && c.seccion === req.params.seccion
+  );
+  res.json({ data: item || null });
+});
+
+app.post('/api/configuration', async (req, res) => {
+  await delay();
+  const nueva = { id_config: Date.now(), ...req.body };
+  configuracion = [...configuracion, nueva];
+  res.status(201).json({ data: nueva });
+});
+
+app.put('/api/configuration/:id', async (req, res) => {
+  await delay();
+  const item = configuracion.find(c => String(c.id_config) === String(req.params.id));
+  if (!item) return res.status(404).json({ error: 'Configuración no encontrada' });
+  const actualizada = { ...item, ...req.body, id_config: item.id_config };
+  configuracion = configuracion.map(c => (c === item ? actualizada : c));
+  res.json({ data: actualizada });
+});
+
+app.delete('/api/configuration/:id', async (req, res) => {
+  await delay();
+  const item = configuracion.find(c => String(c.id_config) === String(req.params.id));
+  if (!item) return res.status(404).json({ error: 'Configuración no encontrada' });
+  configuracion = configuracion.filter(c => c !== item);
+  res.json({ data: { success: true } });
+});
+
+// ==========================================
+// BÚSQUEDA (SEARCH)
+// ==========================================
+const INDICES_BUSQUEDA = {
+  USUARIOS: () => USERS.map(u => ({
+    nombre_completo: `${u.nombre} ${u.apellido}`.trim(),
+    correo: u.correo,
+    identificacion: u.identificacion,
+    programa: u.programa
+  })),
+  RECURSOS: () => recursos.map(aRecurso),
+  EVENTOS: () => eventos.map(aEvento),
+  SOLICITUDES: () => solicitudes.map(aSolicitud),
+  PQRS: () => pqrs.map(aPqrs),
+  INFO_ACADEMICA: () => publicaciones,
+  RESERVAS: () => reservas.map(r => ({
+    recurso: r.nombre_recurso,
+    motivo: r.motivo,
+    usuario: r.usuario_nombre,
+    tipo_recurso: r.tipo_recurso
+  }))
+};
+
+function buscarEnIndices(termino, tipo, limite) {
+  const terminoNormalizado = String(termino || "").toLowerCase();
+  const indices = tipo && INDICES_BUSQUEDA[tipo]
+    ? [[tipo, INDICES_BUSQUEDA[tipo]]]
+    : Object.entries(INDICES_BUSQUEDA);
+
+  return indices
+    .map(([index, obtener]) => ({
+      index,
+      hits: obtener()
+        .filter(item => JSON.stringify(item).toLowerCase().includes(terminoNormalizado))
+        .slice(0, limite)
+        .map(source => ({ source }))
+    }))
+    .filter(bloque => bloque.hits.length > 0);
+}
+
+app.get('/api/search/indices', async (req, res) => {
+  await delay();
+  res.json({ data: Object.keys(INDICES_BUSQUEDA) });
+});
+
+app.get('/api/search/suggest', async (req, res) => {
+  await delay();
+  const limite = Number(req.query.size) || 5;
+  res.json({ results: buscarEnIndices(req.query.q, null, limite) });
+});
+
+app.get('/api/search', async (req, res) => {
+  await delay();
+  const limite = Number(req.query.size) || 10;
+  res.json({ results: buscarEnIndices(req.query.q, req.query.tipo, limite) });
 });
 
 // ==========================================

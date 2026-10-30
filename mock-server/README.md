@@ -46,6 +46,9 @@ El servidor se ejecuta en `http://localhost:3000` por defecto.
 
 ### Notificaciones
 - `GET /api/notifications` - Listar notificaciones
+- `POST /api/notifications` - Crear notificación
+- `PUT /api/notifications/:id` - Actualizar notificación
+- `DELETE /api/notifications/:id` - Eliminar notificación
 - `PATCH /api/notifications/:id/read` - Marcar como leída
 - `PATCH /api/notifications/read-all` - Marcar todas como leídas
 
@@ -53,6 +56,8 @@ El servidor se ejecuta en `http://localhost:3000` por defecto.
 - `GET /api/feedback` - Listar PQRS
 - `GET /api/feedback/:id` - Obtener PQRS por ID
 - `POST /api/feedback` - Crear PQRS
+- `PUT /api/feedback/:id` - Actualizar PQRS
+- `DELETE /api/feedback/:id` - Eliminar PQRS
 
 ### Recursos
 - `GET /api/resources` - Listar recursos
@@ -64,6 +69,27 @@ El servidor se ejecuta en `http://localhost:3000` por defecto.
 ### Reservas
 - `GET /api/reservations` - Listar reservas
 - `POST /api/reservations` - Crear reserva
+- `PUT /api/reservations/:id` - Actualizar reserva
+- `DELETE /api/reservations/:id` - Eliminar reserva
+
+### Información académica
+- `GET /api/academic-info` - Listar publicaciones
+- `GET /api/academic-info/:id` - Obtener publicación por ID
+- `POST /api/academic-info` - Crear publicación
+- `PUT /api/academic-info/:id` - Actualizar publicación
+- `DELETE /api/academic-info/:id` - Eliminar publicación
+
+### Configuración
+- `GET /api/configuration` - Listar configuración (filtrable por `id_usuario`)
+- `GET /api/configuration/usuario/:idUsuario/seccion/:seccion` - Leer una sección
+- `POST /api/configuration` - Crear configuración
+- `PUT /api/configuration/:id` - Actualizar configuración
+- `DELETE /api/configuration/:id` - Eliminar configuración
+
+### Búsqueda
+- `GET /api/search?q=` - Buscar en todas las entidades
+- `GET /api/search/suggest?q=` - Sugerencias
+- `GET /api/search/indices` - Índices disponibles
 
 ### Servicios
 - `GET /api/services` - Listar servicios
