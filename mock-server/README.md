@@ -73,9 +73,19 @@ El servidor se ejecuta en `http://localhost:3000` por defecto.
 
 ## Usuarios de Prueba
 
-Las contraseñas de demo no se publican en el repositorio. Están guardadas con hash bcrypt en
-`server.js` (el login funciona igual); consulta el archivo local `LOGINS_USUARIOS.md`
-(excluido por `.gitignore`) o pídelas al equipo.
+Todas las cuentas usan la contraseña **`admin123`** y son datos ficticios. El login acepta la
+identificación (con o sin puntos), el usuario o el correo.
+
+| Identificación | Usuario | Nombre | Rol |
+|---|---|---|---|
+| 1023456789 | admin | Natalia Rodríguez | Administrador |
+| 1023456788 | funcionario | Carlos Méndez | Administrativo |
+| 1023456787 | profesor | Laura Gómez | Docente |
+| 1023456786 | estudiante | Andrés Torres | Estudiante |
+| 1023456785 | lucia.paredes | Lucía Paredes | Docente |
+| 1023456784 | andres.ruiz | Andrés Ruiz | Estudiante |
+| 1023456783 | maria.torres | María Torres | Estudiante |
+| 1023456782 | jorge.salazar | Jorge Salazar | Estudiante |
 
 ## Configuración
 

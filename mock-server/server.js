@@ -13,16 +13,24 @@ const PORT = process.env.MOCK_PORT || 3000;
 // DATOS SINTÉTICOS
 // ==========================================
 
+// Usuarios demo. `identificacion`/`cedula` es el dato con el que inicia sesión
+// el frontend; `usuario` y `correo` también se aceptan por comodidad.
+// La contraseña de todas las cuentas demo es admin123 (hash bcrypt abajo).
+const PASSWORD_DEMO = "$2b$10$pbeWFX1Tk.1VMle5WjvdP.S6k/qFdj7sVNcFmOMhMyXqiUA0nQwRC";
+
 const USERS = [
-  { id: 1, usuario: "admin", password: "$2b$10$pbeWFX1Tk.1VMle5WjvdP.S6k/qFdj7sVNcFmOMhMyXqiUA0nQwRC", nombre: "Natalia Rodríguez", correo: "natalia.rodriguez@uajs.edu.co", rol: "Administrador", programa: "Dirección Académica", estado: "Activo", cargo: "Coordinadora general", campus: "Campus principal" },
-  { id: 2, usuario: "funcionario", password: "$2b$10$hInVceeGUBrI0HRqwqdHwuBRyMTW5nG3.BQJvheubu78xiAkwLtkW", nombre: "Carlos Méndez", correo: "carlos.mendez@uajs.edu.co", rol: "Administrativo", programa: "Bienestar Universitario", estado: "Activo", cargo: "Analista de servicios", campus: "Campus Norte" },
-  { id: 3, usuario: "profesor", password: "$2b$10$hNiKOE0sb1eZ5vxYA3pdOucMLHY2CMXkugft0XI2nuX.ubEZmWu8S", nombre: "Laura Gómez", correo: "laura.gomez@uajs.edu.co", rol: "Docente", programa: "Matemáticas", estado: "Activo", cargo: "Docente titular", campus: "Campus central" },
-  { id: 4, usuario: "estudiante", password: "$2b$10$QRxek7T64RKjDscNxbHVXeY4q3.2kvxZkUCqlygjSZ7MkuixvNFaS", nombre: "Andrés Torres", correo: "andres.torres@uajs.edu.co", rol: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus central" },
-  { id: 5, usuario: "docente2", password: "$2b$10$SrkujDaRO7eQ88l87Sp/M.201x1FI.oaqD2b5OHAqKu18A3FcqoAm", nombre: "María Fernanda Cárdenas", correo: "mf.cardenas@uajs.edu.co", rol: "Docente", programa: "Ingeniería de Software", estado: "Activo", cargo: "Profesora de proyectos", campus: "Campus principal" },
-  { id: 6, usuario: "estudiante2", password: "$2b$10$jYOKmMUgj6K2jQoL3jPpCOGwUBe9k6Nr6S/Cu4INloR1agOWrWGSi", nombre: "Valentina Morales", correo: "valentina.morales@uajs.edu.co", rol: "Estudiante", programa: "Administración de Empresas", estado: "Activo", cargo: "Estudiante", campus: "Campus occidente" },
-  { id: 7, usuario: "admin2", password: "$2b$10$WBphNKiQjzwaLMcYc58fdOBpI4arewaTlTDT/KxvnWH.bVG2cJIyK", nombre: "Javier Álvarez", correo: "javier.alvarez@uajs.edu.co", rol: "Administrador", programa: "Tecnología e innovación", estado: "Activo", cargo: "Director de operación", campus: "Campus principal" },
-  { id: 8, usuario: "admvo", password: "$2b$10$SDdQcwEI.JOWiwEurOIpK.vdCqOsBjLMWW1ICWYolf45srN00q7Yu", nombre: "Sofía Jiménez", correo: "sofia.jimenez@uajs.edu.co", rol: "Administrativo", programa: "Servicios estudiantiles", estado: "Inactivo", cargo: "Coordinadora administrativa", campus: "Campus centro" }
+  { id: 1, id_usuario: 1, identificacion: "1023456789", cedula: "1023456789", usuario: "admin", password: PASSWORD_DEMO, nombre: "Natalia", apellido: "Rodríguez", correo: "natalia.rodriguez@uajs.edu.co", telefono: "", rol: "Administrador", id_rol: 1, tipo_usuario: "Administrador", programa: "No aplica", estado: "Activo", cargo: "Coordinadora general", campus: "Campus principal", foto_perfil: "" },
+  { id: 2, id_usuario: 2, identificacion: "1023456788", cedula: "1023456788", usuario: "funcionario", password: PASSWORD_DEMO, nombre: "Carlos", apellido: "Méndez", correo: "carlos.mendez@uajs.edu.co", telefono: "", rol: "Administrativo", id_rol: 4, tipo_usuario: "Administrativo", programa: "Bienestar Universitario", estado: "Activo", cargo: "Analista de servicios", campus: "Campus Norte", foto_perfil: "" },
+  { id: 3, id_usuario: 3, identificacion: "1023456787", cedula: "1023456787", usuario: "profesor", password: PASSWORD_DEMO, nombre: "Laura", apellido: "Gómez", correo: "laura.gomez@uajs.edu.co", telefono: "", rol: "Docente", id_rol: 3, tipo_usuario: "Docente", programa: "Matemáticas", estado: "Activo", cargo: "Docente titular", campus: "Campus central", foto_perfil: "" },
+  { id: 4, id_usuario: 4, identificacion: "1023456786", cedula: "1023456786", usuario: "estudiante", password: PASSWORD_DEMO, nombre: "Andrés", apellido: "Torres", correo: "andres.torres@uajs.edu.co", telefono: "", rol: "Estudiante", id_rol: 2, tipo_usuario: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus central", foto_perfil: "" },
+  { id: 5, id_usuario: 5, identificacion: "1023456785", cedula: "1023456785", usuario: "lucia.paredes", password: PASSWORD_DEMO, nombre: "Lucía", apellido: "Paredes", correo: "lucia.paredes@uajs.edu.co", telefono: "", rol: "Docente", id_rol: 3, tipo_usuario: "Docente", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Docente", campus: "Campus principal", foto_perfil: "" },
+  { id: 6, id_usuario: 6, identificacion: "1023456784", cedula: "1023456784", usuario: "andres.ruiz", password: PASSWORD_DEMO, nombre: "Andrés", apellido: "Ruiz", correo: "andres.ruiz@uajs.edu.co", telefono: "", rol: "Estudiante", id_rol: 2, tipo_usuario: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus principal", foto_perfil: "" },
+  { id: 7, id_usuario: 7, identificacion: "1023456783", cedula: "1023456783", usuario: "maria.torres", password: PASSWORD_DEMO, nombre: "María", apellido: "Torres", correo: "maria.torres@uajs.edu.co", telefono: "", rol: "Estudiante", id_rol: 2, tipo_usuario: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus principal", foto_perfil: "" },
+  { id: 8, id_usuario: 8, identificacion: "1023456782", cedula: "1023456782", usuario: "jorge.salazar", password: PASSWORD_DEMO, nombre: "Jorge", apellido: "Salazar", correo: "jorge.salazar@uajs.edu.co", telefono: "", rol: "Estudiante", id_rol: 2, tipo_usuario: "Estudiante", programa: "Ingeniería de Sistemas", estado: "Activo", cargo: "Estudiante", campus: "Campus principal", foto_perfil: "" }
 ];
+
+// Quita el hash de contraseña antes de enviar un usuario al cliente.
+const sinPassword = ({ password, ...resto }) => resto;
 
 const ROLES = [
   { nombre: "Administrador", permisos: ["dashboard","usuarios","solicitudes","reservas","recursos","eventos","notificaciones","pqrs","reportes","perfil","configuracion","info_academica"], acciones: ["registrar_solicitudes","consultar_solicitudes","gestionar_solicitudes","actualizar_estados","realizar_reservas","gestionar_reservas","solicitar_recursos","administrar_recursos","publicar_eventos","consultar_estadisticas","administrar_usuarios","administrar_roles","gestionar_servicios","gestionar_configuracion","supervisar","publicar_info_academica"] },
@@ -135,20 +143,35 @@ app.use(authMiddleware);
 // ==========================================
 app.post('/api/auth/login', async (req, res) => {
   await delay();
-  const { identificacion, password } = req.body;
-  const user = USERS.find(u => (u.usuario === identificacion || u.correo === identificacion));
-  if (!user || !(await bcrypt.compare(password, user.password))) {
+  const { cedula, identificacion, usuario, correo, password } = req.body || {};
+  // El frontend envía `cedula` (igual que el auth-service real). Se aceptan
+  // también `identificacion`, `usuario` y `correo` para no romper clientes
+  // antiguos ni los ejemplos de la documentación.
+  const criterio = String(cedula || identificacion || usuario || correo || "").trim();
+  const documento = criterio.replace(/[.\s-]/g, "");
+  const user = USERS.find(u =>
+    u.estado === "Activo" &&
+    (
+      u.cedula === criterio ||
+      u.cedula === documento ||
+      u.identificacion === criterio ||
+      u.usuario === criterio ||
+      u.correo === criterio
+    )
+  );
+  if (!user || !(await bcrypt.compare(String(password || ""), user.password))) {
     return res.status(401).json({ error: 'Credenciales inválidas' });
   }
-  const token = Buffer.from(JSON.stringify({ id: user.id, usuario: user.usuario, rol: user.rol })).toString('base64');
-  res.json({ data: { token, user: { ...user, password: undefined } } });
+  const token = Buffer.from(JSON.stringify({ id: user.id_usuario, identificacion: user.identificacion, rol: user.id_rol })).toString('base64');
+  res.json({ data: { ...sinPassword(user), rol: user.id_rol, token } });
 });
 
 app.get('/api/auth/me', async (req, res) => {
   await delay();
   if (!req.user) return res.status(401).json({ error: 'No autorizado' });
-  const user = USERS.find(u => u.id === req.user.id);
-  res.json({ data: { ...user, password: undefined } });
+  const user = USERS.find(u => u.id_usuario === req.user.id || u.id === req.user.id);
+  if (!user) return res.status(401).json({ error: 'No autorizado' });
+  res.json({ data: { ...sinPassword(user), rol: user.id_rol } });
 });
 
 // ==========================================
@@ -156,7 +179,7 @@ app.get('/api/auth/me', async (req, res) => {
 // ==========================================
 app.get('/api/users', async (req, res) => {
   await delay();
-  res.json({ data: USERS.map(u => ({ ...u, password: undefined })) });
+  res.json({ data: USERS.map(sinPassword) });
 });
 
 app.get('/api/users/roles', async (req, res) => {
