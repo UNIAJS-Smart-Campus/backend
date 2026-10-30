@@ -8,6 +8,36 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '24h';
 const SALT_ROUNDS = 10;
 
+// Anti fuerza bruta por cuenta: además del límite por IP del gateway, una
+// cuenta se bloquea temporalmente tras varios fallos (ataques distribuidos).
+const MAX_INTENTOS_LOGIN = 10;
+const BLOQUEO_LOGIN_MS = 15 * 60 * 1000;
+const intentosLogin = new Map();
+
+function claveLogin(criterio) {
+    return String(criterio || '').replace(/[.\s-]/g, '').toLowerCase();
+}
+
+function segundosBloqueo(clave) {
+    const estado = intentosLogin.get(clave);
+    if (!estado?.hasta) return 0;
+    if (estado.hasta <= Date.now()) {
+        intentosLogin.delete(clave);
+        return 0;
+    }
+    return Math.ceil((estado.hasta - Date.now()) / 1000);
+}
+
+function registrarFalloLogin(clave) {
+    const estado = intentosLogin.get(clave);
+    const fallos = (estado?.fallos || 0) + 1;
+    if (fallos >= MAX_INTENTOS_LOGIN) {
+        intentosLogin.set(clave, { fallos: 0, hasta: Date.now() + BLOQUEO_LOGIN_MS });
+    } else {
+        intentosLogin.set(clave, { fallos, hasta: 0 });
+    }
+}
+
 // El token del correo solo es válido 1 hora.
 const RESET_TTL_MS = 60 * 60 * 1000;
 // A dónde apunta el enlace del correo (front en desarrollo: Vite).
@@ -60,6 +90,15 @@ async function login(req, res, next) {
         const documento = criterio.replace(/[.\s-]/g, "");
         const documentoBuscado = documento || criterio;
 
+        const clave = claveLogin(criterio);
+        const espera = segundosBloqueo(clave);
+        if (espera > 0) {
+            res.set('Retry-After', String(espera));
+            return res.status(429).json({
+                error: `Demasiados intentos fallidos. Intenta de nuevo en ${Math.ceil(espera / 60)} minuto(s).`
+            });
+        }
+
         const [rows] = await pool.query(
             `SELECT id_usuario, identificacion, usuario, nombre, apellido, correo, id_rol,
                     tipo_usuario, programa, cargo, contraseña, foto_perfil, estado
@@ -80,8 +119,11 @@ async function login(req, res, next) {
         // revelar qué identificaciones existen.
         const coincide = user ? await verificarPassword(user, password) : false;
         if (!coincide) {
+            registrarFalloLogin(clave);
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
+
+        intentosLogin.delete(clave);
 
         const token = jwt.sign(
             { id: user.id_usuario, identificacion: user.identificacion, rol: user.id_rol },
@@ -104,10 +146,19 @@ async function register(req, res, next) {
     try {
         const {
             nombre, apellido, correo, usuario, password, telefono,
-            id_rol, tipo_usuario, cedula, programa, cargo, campus
+            cedula, programa, cargo, campus
         } = req.body;
         if (!nombre || !apellido || !correo || !usuario || !password) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
+        }
+
+        if (String(password).length < 8 || Buffer.byteLength(String(password), 'utf8') > 72) {
+            return res.status(400).json({
+                error: 'La contraseña debe tener entre 8 y 72 caracteres'
+            });
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(correo).trim())) {
+            return res.status(400).json({ error: 'El correo no tiene un formato válido' });
         }
 
         const [existente] = await pool.query(
@@ -136,8 +187,11 @@ async function register(req, res, next) {
                 apellido,
                 correo,
                 telefono || '',
-                id_rol || 2,
-                tipo_usuario || 'Estudiante',
+                // El registro público siempre crea estudiantes. Los roles se
+                // asignan desde users-service por un administrador; nunca se
+                // acepta id_rol/tipo_usuario del cliente.
+                2,
+                'Estudiante',
                 programa || '',
                 cargo || '',
                 campus || 'Campus principal'
@@ -242,9 +296,9 @@ async function restablecer(req, res, next) {
         if (!token || !password) {
             return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' });
         }
-        if (String(password).length < 6) {
+        if (String(password).length < 8) {
             return res.status(400).json({
-                error: 'La contraseña debe tener al menos 6 caracteres'
+                error: 'La contraseña debe tener al menos 8 caracteres'
             });
         }
 

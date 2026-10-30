@@ -72,6 +72,8 @@ const loginLimiter = rateLimit({
 	limit: 5,
 	standardHeaders: true,
 	legacyHeaders: false,
+	// Un login exitoso no debe consumir el cupo de intentos.
+	skipSuccessfulRequests: true,
 	message: {
 		error: 'Demasiados intentos de inicio de sesión. Vuelve a intentarlo en un minuto.'
 	}
@@ -96,6 +98,50 @@ const recuperarLimiter = rateLimit({
 app.use('/api/auth/recuperar', (req, res, next) =>
 	req.method === 'POST' ? recuperarLimiter(req, res, next) : next()
 );
+
+// Registro público: 5 cuentas por hora y IP. Evita crear usuarios en masa.
+const registerLimiter = rateLimit({
+	windowMs: 60 * 60 * 1000,
+	limit: 5,
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: {
+		error: 'Demasiados registros desde esta dirección. Intenta más tarde.'
+	}
+});
+
+app.use('/api/auth/register', (req, res, next) =>
+	req.method === 'POST' ? registerLimiter(req, res, next) : next()
+);
+
+// Restablecer contraseña: 5 intentos cada 15 minutos por IP.
+const restablecerLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	limit: 5,
+	standardHeaders: true,
+	legacyHeaders: false,
+	message: {
+		error: 'Demasiados intentos de restablecimiento. Intenta más tarde.'
+	}
+});
+
+app.use('/api/auth/restablecer', (req, res, next) =>
+	req.method === 'POST' ? restablecerLimiter(req, res, next) : next()
+);
+
+// Límite general de la API: protege contra ráfagas y scraping.
+const apiLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	limit: 300,
+	standardHeaders: true,
+	legacyHeaders: false,
+	skip: (req) => req.method === 'OPTIONS',
+	message: {
+		error: 'Demasiadas solicitudes. Intenta de nuevo en un minuto.'
+	}
+});
+
+app.use('/api', apiLimiter);
 
 // Todo /api/* pasa por verificación de JWT salvo login y register.
 app.use('/api', authMiddleware);

@@ -19,8 +19,12 @@ app.use('/api/search', require('./routes/search.routes'));
 
 app.use((err, req, res, next) => {
     console.error('Search Service Error:', err.message);
-    res.status(err.status || 500).json({
-        error: err.message || 'Error interno del servicio de búsqueda'
+    const status = err.status || 500;
+    // No filtrar detalles internos de Elasticsearch/MySQL al cliente.
+    res.status(status).json({
+        error: status >= 500
+            ? 'Error interno del servicio de busqueda'
+            : err.message || 'Solicitud invalida'
     });
 });
 

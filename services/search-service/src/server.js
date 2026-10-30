@@ -13,6 +13,12 @@ const INTERVALO_REINDEX = Number(process.env.SEARCH_REINDEX_INTERVAL_MS) || 0;
 app.listen(PORT, () => {
     console.log(`Search Service corriendo en http://localhost:${PORT}`);
 
+    // Reindexado inicial: sin esto los indices no existen y /search da 500.
+    const { reindexar: reindexarInicial } = require('./services/indexer');
+    reindexarInicial().catch((error) => {
+        console.error('Reindexado inicial fallo:', error.message);
+    });
+
     if (INTERVALO_REINDEX > 0) {
         const { reindexar } = require('./services/indexer');
         console.log(

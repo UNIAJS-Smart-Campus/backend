@@ -13,6 +13,13 @@ const SEARCHABLE_FIELDS = {
     [INDICATORS.RESERVAS]: ['recurso', 'tipo_recurso', 'ubicacion', 'usuario', 'motivo', 'observaciones', 'estado']
 };
 
+/** Evita que from/size manipulados pidan páginas gigantes o negativas. */
+function paginacionBusqueda(from, size, porDefecto = 10) {
+    const desde = Math.max(0, Math.min(10000, Number.parseInt(from, 10) || 0));
+    const tamano = Math.max(1, Math.min(50, Number.parseInt(size, 10) || porDefecto));
+    return { desde, tamano };
+}
+
 async function searchAll(req, res, next) {
     try {
         const { q, tipo, from = 0, size = 10 } = req.query;
@@ -22,6 +29,8 @@ async function searchAll(req, res, next) {
                 error: 'El término de búsqueda debe tener al menos 2 caracteres'
             });
         }
+
+        const { desde, tamano } = paginacionBusqueda(from, size);
 
         const tipoPedido = tipo && INDICATORS[tipo.toUpperCase()];
 
@@ -47,8 +56,8 @@ async function searchAll(req, res, next) {
             const fields = SEARCHABLE_FIELDS[index] || ['*'];
             const result = await client.search({
                 index,
-                from: parseInt(from),
-                size: parseInt(size),
+                from: desde,
+                size: tamano,
                 query: {
                     multi_match: {
                         query: q,
@@ -105,6 +114,8 @@ async function searchByIndex(req, res, next) {
             });
         }
 
+        const { desde, tamano } = paginacionBusqueda(from, size, 20);
+
         const indexName = INDICATORS[index.toUpperCase()];
         if (!indexName) {
             return res.status(404).json({
@@ -123,8 +134,8 @@ async function searchByIndex(req, res, next) {
 
         const result = await client.search({
             index: indexName,
-            from: parseInt(from),
-            size: parseInt(size),
+            from: desde,
+            size: tamano,
             query: {
                 multi_match: {
                     query: q,
@@ -175,7 +186,7 @@ async function suggest(req, res, next) {
 
         const result = await client.search({
             index: indicesVisibles,
-            size: parseInt(size),
+            size: paginacionBusqueda(0, size, 5).tamano,
             query: {
                 multi_match: {
                     query: q,
