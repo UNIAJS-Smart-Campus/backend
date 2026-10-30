@@ -2,6 +2,8 @@
 
 Microservicios Node.js + Express + MySQL para la plataforma UAJS Smart Campus.
 
+Requiere **Node.js 22 LTS** (ver `.nvmrc`).
+
 ## Estructura
 
 ```

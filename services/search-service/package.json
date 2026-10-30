@@ -17,5 +17,8 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.0"
+  },
+  "overrides": {
+    "tslib": "2.8.1"
   }
 }
