@@ -1,5 +1,8 @@
 const pool = require('../config/database');
 
+const esGestor = (actor) => ['1', '4'].includes(String(actor?.rol));
+const idActor = (actor) => Number(actor?.id);
+
 // Columnas que el frontend puede enviar. La lista blanca evita inyección de
 // columnas y, sobre todo, que un PUT parcial vacíe columnas NOT NULL al no
 // venir en el body (mismo patrón que requests-service).
@@ -12,7 +15,11 @@ const CAMPOS = [
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query('SELECT * FROM pqrs');
+        const actor = req.actor;
+        const [rows] = await pool.query(
+            esGestor(actor) ? 'SELECT * FROM pqrs' : 'SELECT * FROM pqrs WHERE id_usuario = ?',
+            esGestor(actor) ? [] : [idActor(actor)]
+        );
         res.json({ data: rows });
     } catch (error) {
         next(error);
@@ -26,6 +33,9 @@ async function getOne(req, res, next) {
         if (!rows.length) {
             return res.status(404).json({ error: 'PQRS no encontrada' });
         }
+        if (!esGestor(req.actor) && Number(rows[0].id_usuario) !== idActor(req.actor)) {
+            return res.status(403).json({ error: 'No puedes ver una PQRS ajena' });
+        }
         res.json({ data: rows[0] });
     } catch (error) {
         next(error);
@@ -37,6 +47,11 @@ async function create(req, res, next) {
         const { tipo, fecha, estado, descripcion } = req.body;
         if (!tipo || !fecha || !estado || !descripcion) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
+        }
+
+        // Una PQRS siempre queda a nombre de quien la radica (salvo gestores).
+        if (!esGestor(req.actor)) {
+            req.body.id_usuario = idActor(req.actor);
         }
 
         // Solo se insertan los campos presentes: el resto toma su DEFAULT.
@@ -62,6 +77,9 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
     try {
+        if (!esGestor(req.actor)) {
+            return res.status(403).json({ error: 'Solo administración puede gestionar PQRS' });
+        }
         const { id } = req.params;
 
         // Actualización parcial: solo las columnas presentes en el body.
@@ -94,6 +112,9 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
     try {
+        if (!esGestor(req.actor)) {
+            return res.status(403).json({ error: 'Solo administración puede eliminar PQRS' });
+        }
         const { id } = req.params;
         const [result] = await pool.query('DELETE FROM pqrs WHERE id_pqrs = ?', [id]);
         if (result.affectedRows === 0) {

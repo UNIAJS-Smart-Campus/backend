@@ -10,7 +10,8 @@ function roomForUser(idUsuario) {
 }
 
 function esRolAdministrativo(rol) {
-    return rol === 'Administrador' || rol === 'Administrativo' || rol === 'Funcionario';
+    const valor = String(rol ?? '').toLowerCase();
+    return ['1', '4', 'administrador', 'administrativo', 'funcionario'].includes(valor);
 }
 
 /**
@@ -42,7 +43,9 @@ function initRealtime(httpServer) {
         }
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET);
+            const decoded = jwt.verify(token, JWT_SECRET, {
+                algorithms: ['HS256']
+            });
             if (!decoded?.id) {
                 return next(new Error('Token inválido'));
             }
@@ -54,10 +57,10 @@ function initRealtime(httpServer) {
     });
 
     io.on('connection', (socket) => {
-        const { id, tipo_usuario } = socket.data.actor;
+        const { id, rol } = socket.data.actor;
 
         socket.join(roomForUser(id));
-        if (esRolAdministrativo(tipo_usuario)) {
+        if (esRolAdministrativo(rol)) {
             socket.join('admins');
         }
     });

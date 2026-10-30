@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/academic-info', require('./routes/academic-info.routes'));
+app.use('/api/academic-info', require('./middlewares/actor'), require('./routes/academic-info.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

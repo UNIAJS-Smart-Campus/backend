@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/feedback', require('./routes/feedback.routes'));
+app.use('/api/feedback', require('./middlewares/actor'), require('./routes/feedback.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/reservations', require('./routes/reservations.routes'));
+app.use('/api/reservations', require('./middlewares/actor'), require('./routes/reservations.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

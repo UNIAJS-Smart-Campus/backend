@@ -100,6 +100,65 @@ app.use('/api/auth/recuperar', (req, res, next) =>
 // Todo /api/* pasa por verificación de JWT salvo login y register.
 app.use('/api', authMiddleware);
 
+// Autorización por rol. El JWT trae `rol` numérico:
+// 1 = Administrador, 2 = Estudiante, 3 = Docente, 4 = Administrativo.
+// El gateway corta aquí lo que no corresponde; cada servicio valida además
+// la propiedad de sus filas (por ejemplo, una reserva propia).
+const GESTORES = [1, 4];
+const REGLAS_ROL = [
+	{ metodos: ['GET'], patron: /^\/api\/users(\/|$)/, roles: [1, 4] },
+	{ metodos: ['POST', 'PUT', 'PATCH', 'DELETE'], patron: /^\/api\/users(\/|$)/, roles: [1] },
+	{
+		metodos: ['POST', 'PUT', 'PATCH', 'DELETE'],
+		patron: /^\/api\/events(\/|$)/,
+		roles: [1],
+		// Inscribirse/desinscribirse es para cualquier usuario autenticado;
+		// el servicio comprueba que sea su propia inscripción.
+		excepto: /^\/api\/events\/[^/]+\/inscripciones(\/|$)/
+	},
+	{ metodos: ['POST', 'PUT', 'PATCH', 'DELETE'], patron: /^\/api\/resources(\/|$)/, roles: [1, 4] },
+	{ metodos: ['POST', 'PUT', 'PATCH', 'DELETE'], patron: /^\/api\/academic-info(\/|$)/, roles: [1, 3] },
+	{ metodos: ['PUT', 'PATCH', 'DELETE'], patron: /^\/api\/requests(\/|$)/, roles: GESTORES },
+	{ metodos: ['POST'], patron: /^\/api\/requests\/[^/]+\/(avance|notas)$/, roles: GESTORES },
+	{ metodos: ['PUT', 'PATCH', 'DELETE'], patron: /^\/api\/feedback(\/|$)/, roles: GESTORES }
+];
+
+function autorizar(req, res, next) {
+	const ruta = req.originalUrl.split('?')[0];
+	const regla = REGLAS_ROL.find(
+		(item) =>
+			item.metodos.includes(req.method) &&
+			item.patron.test(ruta) &&
+			!(item.excepto && item.excepto.test(ruta))
+	);
+
+	if (!regla) return next();
+
+	if (!regla.roles.includes(Number(req.user?.rol))) {
+		return res.status(403).json({ error: 'No tienes permisos para esta acción' });
+	}
+	next();
+}
+
+app.use('/api', autorizar);
+
+// Socket.IO: el upgrade viaja al notifications-service. La autenticación del
+// handshake la hace ese servicio con el JWT que envía el cliente en `auth`.
+// Socket.IO: el upgrade viaja al notifications-service. Se usa pathFilter
+// (no un mount de Express) para conservar /socket.io tanto en el polling
+// como en el upgrade WebSocket.
+const socketProxy = createProxyMiddleware({
+	pathFilter: (path) => path.startsWith('/socket.io'),
+	target: routes.notifications,
+	changeOrigin: true,
+	ws: true
+});
+app.use(socketProxy);
+// http-proxy-middleware se suscribe al evento `upgrade` recién con la primera
+// petición HTTP. Un cliente que abre solo WebSocket nunca lo dispararía, así
+// que lo enganchamos explícitamente en server.js.
+app.locals.socketProxy = socketProxy;
+
 // Tras una escritura exitosa en una tabla indexada, avisa al search-service
 // para que reindexe ese índice. Un solo punto de cambio para los seis
 // servicios, y no bloquea la respuesta (ver middlewares/reindexado.js).

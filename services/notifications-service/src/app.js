@@ -15,7 +15,8 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/notifications', require('./routes/notifications.routes'));
+app.post('/api/notifications/webhook', require('./controllers/notifications.controller').webhook);
+app.use('/api/notifications', require('./middlewares/actor'), require('./routes/notifications.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

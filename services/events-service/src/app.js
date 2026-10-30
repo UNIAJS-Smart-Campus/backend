@@ -15,7 +15,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/events', require('./routes/events.routes'));
+app.use('/api/events', require('./middlewares/actor'), require('./routes/events.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

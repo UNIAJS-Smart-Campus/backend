@@ -1,7 +1,13 @@
 const pool = require('../config/database');
 
+const esGestor = (actor) => ['1', '4'].includes(String(actor?.rol));
+const idActor = (actor) => Number(actor?.id);
+
 async function getAll(req, res, next) {
     try {
+        const actor = req.actor;
+        const filtro = esGestor(actor) ? '' : ' WHERE r.id_usuario = ?';
+        const params = esGestor(actor) ? [] : [idActor(actor)];
         const [rows] = await pool.query(`
             SELECT r.*,
                    u.nombre AS usuario_nombre,
@@ -11,7 +17,8 @@ async function getAll(req, res, next) {
             FROM reservas r
             LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
             LEFT JOIN recursos rec ON r.id_recurso = rec.id_recurso
-        `);
+            ${filtro}
+        `, params);
         res.json({ data: rows });
     } catch (error) {
         next(error);
@@ -35,6 +42,9 @@ async function getOne(req, res, next) {
         if (!rows.length) {
             return res.status(404).json({ error: 'Reserva no encontrada' });
         }
+        if (!esGestor(req.actor) && Number(rows[0].id_usuario) !== idActor(req.actor)) {
+            return res.status(403).json({ error: 'No puedes ver una reserva ajena' });
+        }
         res.json({ data: rows[0] });
     } catch (error) {
         next(error);
@@ -44,12 +54,14 @@ async function getOne(req, res, next) {
 async function create(req, res, next) {
     try {
         const { id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo, estado } = req.body;
-        if (!id_usuario || !id_recurso || !fecha_reserva || !hora_inicio || !hora_fin || !estado) {
+        // Un usuario normal solo puede reservar para sí mismo.
+        const idUsuarioFinal = esGestor(req.actor) ? (id_usuario || idActor(req.actor)) : idActor(req.actor);
+        if (!idUsuarioFinal || !id_recurso || !fecha_reserva || !hora_inicio || !hora_fin || !estado) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
         const [result] = await pool.query(
             'INSERT INTO reservas (id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo || '', estado]
+            [idUsuarioFinal, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo || '', estado]
         );
         const [newReservation] = await pool.query(`
             SELECT r.*, u.nombre AS usuario_nombre, rec.nombre_recurso
@@ -67,14 +79,28 @@ async function create(req, res, next) {
 async function update(req, res, next) {
     try {
         const { id } = req.params;
-        const { id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo, estado } = req.body;
-        const [result] = await pool.query(
-            'UPDATE reservas SET id_usuario = ?, id_recurso = ?, fecha_reserva = ?, hora_inicio = ?, hora_fin = ?, motivo = ?, estado = ? WHERE id_reserva = ?',
-            [id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo || '', estado, id]
-        );
-        if (result.affectedRows === 0) {
+        const [actual] = await pool.query('SELECT id_usuario FROM reservas WHERE id_reserva = ?', [id]);
+        if (!actual.length) {
             return res.status(404).json({ error: 'Reserva no encontrada' });
         }
+
+        if (!esGestor(req.actor)) {
+            if (Number(actual[0].id_usuario) !== idActor(req.actor)) {
+                return res.status(403).json({ error: 'No puedes modificar una reserva ajena' });
+            }
+            // Un usuario solo puede cancelar; no cambia fechas, recurso ni dueño.
+            await pool.query('UPDATE reservas SET estado = ? WHERE id_reserva = ?', ['Cancelada', id]);
+        } else {
+            const { id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo, estado } = req.body;
+            const [result] = await pool.query(
+                'UPDATE reservas SET id_usuario = ?, id_recurso = ?, fecha_reserva = ?, hora_inicio = ?, hora_fin = ?, motivo = ?, estado = ? WHERE id_reserva = ?',
+                [id_usuario, id_recurso, fecha_reserva, hora_inicio, hora_fin, motivo || '', estado, id]
+            );
+            if (result.affectedRows === 0) {
+                return res.status(404).json({ error: 'Reserva no encontrada' });
+            }
+        }
+
         const [updated] = await pool.query(`
             SELECT r.*, u.nombre AS usuario_nombre, rec.nombre_recurso
             FROM reservas r
@@ -91,10 +117,14 @@ async function update(req, res, next) {
 async function remove(req, res, next) {
     try {
         const { id } = req.params;
-        const [result] = await pool.query('DELETE FROM reservas WHERE id_reserva = ?', [id]);
-        if (result.affectedRows === 0) {
+        const [actual] = await pool.query('SELECT id_usuario FROM reservas WHERE id_reserva = ?', [id]);
+        if (!actual.length) {
             return res.status(404).json({ error: 'Reserva no encontrada' });
         }
+        if (!esGestor(req.actor) && Number(actual[0].id_usuario) !== idActor(req.actor)) {
+            return res.status(403).json({ error: 'No puedes eliminar una reserva ajena' });
+        }
+        await pool.query('DELETE FROM reservas WHERE id_reserva = ?', [id]);
         res.status(204).send();
     } catch (error) {
         next(error);

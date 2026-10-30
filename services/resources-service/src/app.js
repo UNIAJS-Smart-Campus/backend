@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/resources', require('./routes/resources.routes'));
+app.use('/api/resources', require('./middlewares/actor'), require('./routes/resources.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

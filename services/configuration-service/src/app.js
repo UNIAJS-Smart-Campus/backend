@@ -13,7 +13,7 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/configuration', require('./routes/configuration.routes'));
+app.use('/api/configuration', require('./middlewares/actor'), require('./routes/configuration.routes'));
 
 app.use(require('./middlewares/errorHandler'));
 

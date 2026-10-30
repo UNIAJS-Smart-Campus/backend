@@ -1,5 +1,8 @@
 const pool = require('../config/database');
 
+const esGestor = (actor) => ['1', '4'].includes(String(actor?.rol));
+const idActor = (actor) => Number(actor?.id);
+
 const SELECT_SOLICITUD = `
     SELECT s.*,
            u.nombre   AS usuario_nombre,
@@ -25,7 +28,11 @@ async function getHistorial(idSolicitud) {
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query(SELECT_SOLICITUD);
+        const actor = req.actor;
+        const [rows] = await pool.query(
+            esGestor(actor) ? SELECT_SOLICITUD : `${SELECT_SOLICITUD} WHERE s.id_usuario = ?`,
+            esGestor(actor) ? [] : [idActor(actor)]
+        );
 
         // El historial viaja anidado para no disparar una consulta por solicitud.
         const [historial] = await pool.query(
@@ -61,6 +68,9 @@ async function getOne(req, res, next) {
         if (!rows.length) {
             return res.status(404).json({ error: 'Solicitud no encontrada' });
         }
+        if (!esGestor(req.actor) && Number(rows[0].id_usuario) !== idActor(req.actor)) {
+            return res.status(403).json({ error: 'No puedes ver una solicitud ajena' });
+        }
         const historial = await getHistorial(id);
         res.json({ data: { ...rows[0], historial } });
     } catch (error) {
@@ -87,13 +97,16 @@ async function create(req, res, next) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
 
+        // Un usuario normal no puede crear solicitudes a nombre de otro.
+        const idUsuarioFinal = esGestor(req.actor) ? (id_usuario || null) : idActor(req.actor);
+
         const [result] = await pool.query(
             `INSERT INTO solicitudes
                 (codigo, tipo, id_usuario, id_servicio, id_responsable, prioridad, dependencia,
                  fecha_solicitud, descripcion, solicitante, estado, respuesta)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                codigo || '', tipo, id_usuario || null, id_servicio || null, id_responsable || null,
+                codigo || '', tipo, idUsuarioFinal, id_servicio || null, id_responsable || null,
                 prioridad || 'Media', dependencia || '', fecha_solicitud || new Date(), descripcion,
                 solicitante || '', estado || 'REGISTRADA', respuesta || ''
             ]
@@ -116,6 +129,9 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
     try {
+        if (!esGestor(req.actor)) {
+            return res.status(403).json({ error: 'Solo administración puede modificar solicitudes' });
+        }
         const { id } = req.params;
         const body = req.body || {};
 
@@ -184,6 +200,9 @@ async function update(req, res, next) {
 /** POST /:id/avance — ejecuta una acción del flujo y deja registro en el historial. */
 async function advance(req, res, next) {
     try {
+        if (!esGestor(req.actor)) {
+            return res.status(403).json({ error: 'Solo administración puede cambiar el estado' });
+        }
         const { id } = req.params;
         const { accion, estado, responsable = '', usuario = '', descripcion = '' } = req.body || {};
 
@@ -245,6 +264,9 @@ async function advance(req, res, next) {
 /** POST /:id/notas — agrega una nota suelta al historial sin cambiar el estado. */
 async function addNota(req, res, next) {
     try {
+        if (!esGestor(req.actor)) {
+            return res.status(403).json({ error: 'Solo administración puede agregar notas' });
+        }
         const { id } = req.params;
         const { usuario = '', descripcion = '' } = req.body || {};
 
@@ -269,6 +291,9 @@ async function addNota(req, res, next) {
 
 async function remove(req, res, next) {
     try {
+        if (!esGestor(req.actor)) {
+            return res.status(403).json({ error: 'Solo administración puede eliminar solicitudes' });
+        }
         const { id } = req.params;
         const [result] = await pool.query('DELETE FROM solicitudes WHERE id_solicitud = ?', [id]);
         if (result.affectedRows === 0) {

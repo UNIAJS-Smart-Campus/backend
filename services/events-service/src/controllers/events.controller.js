@@ -94,7 +94,12 @@ async function inscribir(req, res, next) {
         const { id } = req.params;
         const { id_usuario } = req.body;
 
-        if (!id_usuario) {
+        // Un usuario solo puede inscribirse a sí mismo; el admin puede inscribir a otro.
+        const idUsuarioFinal = String(req.actor.rol) === '1'
+            ? (id_usuario || req.actor.id)
+            : req.actor.id;
+
+        if (!idUsuarioFinal) {
             return res.status(400).json({ error: 'id_usuario es obligatorio' });
         }
 
@@ -120,7 +125,7 @@ async function inscribir(req, res, next) {
 
         const [existente] = await conn.query(
             'SELECT id_inscripcion FROM inscripciones_eventos WHERE id_evento = ? AND id_usuario = ?',
-            [id, id_usuario]
+            [id, idUsuarioFinal]
         );
         if (existente.length) {
             await conn.rollback();
@@ -129,7 +134,7 @@ async function inscribir(req, res, next) {
 
         await conn.query(
             'INSERT INTO inscripciones_eventos (id_evento, id_usuario) VALUES (?, ?)',
-            [id, id_usuario]
+            [id, idUsuarioFinal]
         );
         await conn.query(
             'UPDATE eventos_y_actividades SET inscritos = inscritos + 1 WHERE id_evento = ?',
@@ -152,6 +157,11 @@ async function desinscribir(req, res, next) {
     let conn;
     try {
         const { id, idUsuario } = req.params;
+
+        // Solo el propio usuario (o un administrador) puede desinscribirse.
+        if (String(req.actor.rol) !== '1' && Number(idUsuario) !== Number(req.actor.id)) {
+            return res.status(403).json({ error: 'No puedes quitar la inscripción de otro usuario' });
+        }
 
         conn = await pool.getConnection();
         await conn.beginTransaction();
