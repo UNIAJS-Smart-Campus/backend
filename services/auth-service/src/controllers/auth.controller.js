@@ -66,15 +66,11 @@ async function verificarPassword(usuario, password) {
     const esHash = typeof almacenado === 'string' &&
         /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(almacenado);
 
-    if (esHash) {
-        return bcrypt.compare(password, almacenado);
-    }
+    // Solo se aceptan hashes bcrypt. Ya no hay fallback a texto plano:
+    // una fila antigua sin hash debe migrarse antes de permitir el login.
+    if (!esHash) return false;
 
-    // Migración transparente: la fila es de la semilla en texto plano.
-    if (almacenado !== password) return false;
-    const hash = await bcrypt.hash(password, SALT_ROUNDS);
-    await pool.query('UPDATE usuarios SET contraseña = ? WHERE id_usuario = ?', [hash, usuario.id_usuario]);
-    return true;
+    return bcrypt.compare(password, almacenado);
 }
 
 async function login(req, res, next) {
@@ -181,7 +177,7 @@ async function register(req, res, next) {
             [
                 usuario,
                 usuario,
-                cedula || null,
+                cedula || usuario,
                 hash,
                 nombre,
                 apellido,
