@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const { notificar } = require('../services/notifications.client');
 
 async function getAll(req, res, next) {
     try {
@@ -144,7 +145,15 @@ async function inscribir(req, res, next) {
         const [updated] = await conn.query('SELECT * FROM eventos_y_actividades WHERE id_evento = ?', [id]);
         await conn.commit();
 
-        res.status(201).json({ data: updated[0] });
+        const eventoInscrito = updated[0];
+        notificar({
+            id_usuario: idUsuarioFinal,
+            titulo: 'Inscripción confirmada',
+            mensaje: `Quedaste inscrito en ${eventoInscrito.nombre_evento} (${eventoInscrito.fecha}).`,
+            tipo_notificacion: 'Evento',
+            icono: 'eventos'
+        });
+        res.status(201).json({ data: eventoInscrito });
     } catch (error) {
         if (conn) await conn.rollback().catch(() => {});
         next(error);
@@ -183,7 +192,15 @@ async function desinscribir(req, res, next) {
         const [updated] = await conn.query('SELECT * FROM eventos_y_actividades WHERE id_evento = ?', [id]);
         await conn.commit();
 
-        res.json({ data: updated[0] });
+        const eventoCancelado = updated[0];
+        notificar({
+            id_usuario: idUsuario,
+            titulo: 'Inscripción cancelada',
+            mensaje: `Cancelaste tu inscripción a ${eventoCancelado.nombre_evento}.`,
+            tipo_notificacion: 'Evento',
+            icono: 'eventos'
+        });
+        res.json({ data: eventoCancelado });
     } catch (error) {
         if (conn) await conn.rollback().catch(() => {});
         next(error);

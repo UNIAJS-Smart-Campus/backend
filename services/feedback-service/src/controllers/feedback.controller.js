@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const { notificar } = require('../services/notifications.client');
 
 const esGestor = (actor) => ['1', '4'].includes(String(actor?.rol));
 const idActor = (actor) => Number(actor?.id);
@@ -69,7 +70,15 @@ async function create(req, res, next) {
             valores
         );
         const [newPqrs] = await pool.query('SELECT * FROM pqrs WHERE id_pqrs = ?', [result.insertId]);
-        res.status(201).json({ data: newPqrs[0] });
+        const pqrs = newPqrs[0];
+        notificar({
+            id_usuario: pqrs.id_usuario,
+            titulo: 'PQRS radicada',
+            mensaje: `Tu ${pqrs.tipo || 'PQRS'} quedó registrada con el código PQRS-${pqrs.id_pqrs}.`,
+            tipo_notificacion: 'PQRS',
+            icono: 'pqrs'
+        });
+        res.status(201).json({ data: pqrs });
     } catch (error) {
         next(error);
     }
@@ -104,7 +113,15 @@ async function update(req, res, next) {
             return res.status(404).json({ error: 'PQRS no encontrada' });
         }
         const [updated] = await pool.query('SELECT * FROM pqrs WHERE id_pqrs = ?', [id]);
-        res.json({ data: updated[0] });
+        const pqrsActualizada = updated[0];
+        notificar({
+            id_usuario: pqrsActualizada.id_usuario,
+            titulo: 'PQRS actualizada',
+            mensaje: `Tu PQRS-${pqrsActualizada.id_pqrs} cambió a estado ${pqrsActualizada.estado}.`,
+            tipo_notificacion: 'PQRS',
+            icono: 'pqrs'
+        });
+        res.json({ data: pqrsActualizada });
     } catch (error) {
         next(error);
     }

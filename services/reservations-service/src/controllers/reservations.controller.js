@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const { notificar } = require('../services/notifications.client');
 
 const esGestor = (actor) => ['1', '4'].includes(String(actor?.rol));
 const idActor = (actor) => Number(actor?.id);
@@ -70,7 +71,16 @@ async function create(req, res, next) {
             LEFT JOIN recursos rec ON r.id_recurso = rec.id_recurso
             WHERE r.id_reserva = ?
         `, [result.insertId]);
-        res.status(201).json({ data: newReservation[0] });
+
+        const reserva = newReservation[0];
+        notificar({
+            id_usuario: idUsuarioFinal,
+            titulo: 'Reserva registrada',
+            mensaje: `Tu reserva de ${reserva.nombre_recurso || 'un recurso'} para el ${fecha_reserva} (${hora_inicio} - ${hora_fin}) quedó ${estado}.`,
+            tipo_notificacion: 'Reserva',
+            icono: 'reservas'
+        });
+        res.status(201).json({ data: reserva });
     } catch (error) {
         next(error);
     }
@@ -108,7 +118,16 @@ async function update(req, res, next) {
             LEFT JOIN recursos rec ON r.id_recurso = rec.id_recurso
             WHERE r.id_reserva = ?
         `, [id]);
-        res.json({ data: updated[0] });
+
+        const reservaActualizada = updated[0];
+        notificar({
+            id_usuario: reservaActualizada.id_usuario,
+            titulo: 'Reserva actualizada',
+            mensaje: `Tu reserva de ${reservaActualizada.nombre_recurso || 'un recurso'} cambió a estado ${reservaActualizada.estado}.`,
+            tipo_notificacion: 'Reserva',
+            icono: 'reservas'
+        });
+        res.json({ data: reservaActualizada });
     } catch (error) {
         next(error);
     }

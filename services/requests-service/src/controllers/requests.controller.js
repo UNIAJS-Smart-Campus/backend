@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const { notificar } = require('../services/notifications.client');
 
 const esGestor = (actor) => ['1', '4'].includes(String(actor?.rol));
 const idActor = (actor) => Number(actor?.id);
@@ -121,7 +122,15 @@ async function create(req, res, next) {
 
         const [newReq] = await pool.query(`${SELECT_SOLICITUD} WHERE s.id_solicitud = ?`, [result.insertId]);
         const historial = await getHistorial(result.insertId);
-        res.status(201).json({ data: { ...newReq[0], historial } });
+        const solicitud = newReq[0];
+        notificar({
+            id_usuario: idUsuarioFinal,
+            titulo: 'Solicitud registrada',
+            mensaje: `Tu solicitud ${solicitud.codigo || solicitud.id_solicitud} (${tipo}) quedó en estado ${solicitud.estado}.`,
+            tipo_notificacion: 'Solicitud',
+            icono: 'solicitudes'
+        });
+        res.status(201).json({ data: { ...solicitud, historial } });
     } catch (error) {
         next(error);
     }
@@ -191,6 +200,13 @@ async function update(req, res, next) {
 
         const [updated] = await pool.query(`${SELECT_SOLICITUD} WHERE s.id_solicitud = ?`, [id]);
         const historial = await getHistorial(id);
+        notificar({
+            id_usuario: updated[0].id_usuario,
+            titulo: 'Solicitud actualizada',
+            mensaje: `Tu solicitud ${updated[0].codigo || id} quedó en estado ${updated[0].estado}.`,
+            tipo_notificacion: 'Solicitud',
+            icono: 'solicitudes'
+        });
         res.json({ data: { ...updated[0], historial } });
     } catch (error) {
         next(error);
@@ -255,6 +271,13 @@ async function advance(req, res, next) {
 
         const [updated] = await pool.query(`${SELECT_SOLICITUD} WHERE s.id_solicitud = ?`, [id]);
         const historial = await getHistorial(id);
+        notificar({
+            id_usuario: updated[0].id_usuario,
+            titulo: 'Solicitud actualizada',
+            mensaje: `Tu solicitud ${updated[0].codigo || id} cambió a estado ${updated[0].estado}.`,
+            tipo_notificacion: 'Solicitud',
+            icono: 'solicitudes'
+        });
         res.json({ data: { ...updated[0], historial } });
     } catch (error) {
         next(error);
