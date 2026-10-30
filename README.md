@@ -19,7 +19,6 @@ backend/
 │   ├── academic-info-service/  # Información académica (3009)
 │   ├── configuration-service/  # Configuración (3010)
 │   └── search-service/         # Búsqueda / Elasticsearch (3011)
-├── mock-server/                # API de demo sin MySQL
 ├── shared/
 ├── database/
 │   ├── migrations/
