@@ -1,4 +1,475 @@
-name: proyecto-uajs-versionfinal-esta-vezsi
+# Stack de desarrollo: MySQL, phpMyAdmin, Elasticsearch y microservicios.
+# Ejecutar desde backend/: docker compose up -d
+# El frontend se ejecuta aparte en ../frontend con npm run dev.
 
-include:
-  - ../docker-compose.yml
+name: uajs-smart-campus
+
+services:
+
+  # =========================================================
+  # MYSQL
+  # =========================================================
+  mysql:
+    image: mysql:8.0
+    container_name: uajs-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: uajs_smart_campus
+
+    ports:
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3306}:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./uajs_smart_campus.sql:/docker-entrypoint-initdb.d/uajs_smart_campus.sql:ro
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # =========================================================
+  # INICIALIZACION DE LA BASE DE DATOS
+  # =========================================================
+  # El entrypoint de MySQL solo importa el .sql cuando el volumen se crea
+  # por primera vez. Este servicio comprueba si existe la tabla `usuarios`
+  # y, si no, recrea la base e importa backend/uajs_smart_campus.sql.
+  # Para forzar un reimporte (borra los datos actuales): DB_RESET=1
+  db-init:
+    image: mysql:8.0
+    container_name: uajs-db-init
+    restart: "no"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    environment:
+      DB_RESET: "${DB_RESET:-0}"
+
+    volumes:
+      - ./uajs_smart_campus.sql:/sql/uajs_smart_campus.sql:ro
+
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        echo "Esperando a que MySQL acepte conexiones..."
+        until mysqladmin ping -h mysql -uroot --silent; do sleep 2; done
+
+        # Si la tabla usuarios existe y no se pidio DB_RESET=1, no se toca nada.
+        if mysql -h mysql -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='uajs_smart_campus' AND table_name='usuarios'" | grep -qx 1 \
+           && ! env | grep -qx 'DB_RESET=1'; then
+          echo "Base de datos ya desplegada: se conserva la informacion existente."
+          exit 0
+        fi
+
+        echo "Creando/recreando la base de datos uajs_smart_campus..."
+        mysql -h mysql -uroot -e "DROP DATABASE IF EXISTS uajs_smart_campus; CREATE DATABASE uajs_smart_campus CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+
+        echo "Importando uajs_smart_campus.sql..."
+        mysql -h mysql -uroot uajs_smart_campus < /sql/uajs_smart_campus.sql
+        echo "Base de datos desplegada correctamente."
+
+  # =========================================================
+  # PHPMYADMIN
+  # =========================================================
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: uajs-phpmyadmin
+    restart: unless-stopped
+
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: ""
+      UPLOAD_LIMIT: 64M
+      HIDE_PHP_VERSION: "true"
+      TZ: America/Bogota
+
+    ports:
+      - "127.0.0.1:${PHPMYADMIN_PORT:-8080}:80"
+
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+
+
+  # =========================================================
+  # ELASTICSEARCH
+  # =========================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    container_name: uajs-elasticsearch
+    restart: unless-stopped
+
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+
+    ports:
+      - "127.0.0.1:9200:9200"
+
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+
+  # =========================================================
+  # SEARCH SERVICE
+  # =========================================================
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-search-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      ELASTICSEARCH_NODE: http://elasticsearch:9200
+      SEARCH_SERVICE_PORT: 3011
+      PORT: 3011
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+
+  # =========================================================
+  # API GATEWAY
+  # =========================================================
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+
+    container_name: uajs-gateway
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3000
+
+    ports:
+      - "3000:3000"
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # AUTH SERVICE
+  # =========================================================
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-auth-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3001
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # USERS SERVICE
+  # =========================================================
+  users-service:
+    build:
+      context: ./services/users-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-users-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3002
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # EVENTS SERVICE
+  # =========================================================
+  events-service:
+    build:
+      context: ./services/events-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-events-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3003
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET:-uajs-dev-webhook-secret}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # RESERVATIONS SERVICE
+  # =========================================================
+  reservations-service:
+    build:
+      context: ./services/reservations-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-reservations-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3004
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET:-uajs-dev-webhook-secret}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # NOTIFICATIONS SERVICE
+  # =========================================================
+  notifications-service:
+    build:
+      context: ./services/notifications-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-notifications-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3005
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET:-uajs-dev-webhook-secret}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # REQUESTS SERVICE
+  # =========================================================
+  requests-service:
+    build:
+      context: ./services/requests-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-requests-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3006
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET:-uajs-dev-webhook-secret}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # RESOURCES SERVICE
+  # =========================================================
+  resources-service:
+    build:
+      context: ./services/resources-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-resources-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3007
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # FEEDBACK SERVICE
+  # =========================================================
+  feedback-service:
+    build:
+      context: ./services/feedback-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-feedback-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3008
+      NOTIFICATIONS_WEBHOOK_URL: http://notifications-service:3005/api/notifications/webhook
+      NOTIFICATIONS_WEBHOOK_SECRET: ${NOTIFICATIONS_WEBHOOK_SECRET:-uajs-dev-webhook-secret}
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # ACADEMIC INFO SERVICE
+  # =========================================================
+  academic-info-service:
+    build:
+      context: ./services/academic-info-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-academic-info-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3009
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  # =========================================================
+  # CONFIGURATION SERVICE
+  # =========================================================
+  configuration-service:
+    build:
+      context: ./services/configuration-service
+      dockerfile: Dockerfile
+
+    container_name: uajs-configuration-service
+    restart: unless-stopped
+
+    env_file:
+      - ./.env
+
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: uajs_smart_campus
+      PORT: 3010
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+# =========================================================
+# VOLUMES
+# =========================================================
+volumes:
+  mysql_data:
+  elasticsearch_data:

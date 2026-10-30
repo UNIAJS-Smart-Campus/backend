@@ -28,16 +28,17 @@ backend/
 
 ## Base de datos y phpMyAdmin con Docker
 
-Desde la raíz del monorepo (donde está `docker-compose.yml`):
+Desde `backend/` (el compose de desarrollo esta versionado en este repo):
 
 ```bash
+cd backend
 docker compose up -d mysql db-init phpmyadmin
 ```
 
-- MySQL: `127.0.0.1:3306` — usuario `root`, sin contraseña (solo local).
-- phpMyAdmin: <http://localhost:8080> — entra como `root` con la contraseña vacía.
-- `db-init` espera a que MySQL esté sano y comprueba si existe la tabla `usuarios`:
-  - si no existe, recrea `uajs_smart_campus` e importa `backend/uajs_smart_campus.sql`;
+- MySQL: `127.0.0.1:3306` - usuario `root`, sin contrasena (solo local).
+- phpMyAdmin: <http://localhost:8080> - entra como `root` con la contrasena vacia.
+- `db-init` espera a que MySQL este sano y comprueba si existe la tabla `usuarios`:
+  - si no existe, recrea `uajs_smart_campus` e importa `uajs_smart_campus.sql`;
   - si ya existe, conserva los datos y termina.
 
 Para reimportar desde cero (elimina los datos actuales):
@@ -50,17 +51,24 @@ $env:DB_RESET="1"; docker compose up db-init
 DB_RESET=1 docker compose up db-init
 ```
 
-Para levantar todo (MySQL, Elasticsearch, microservicios y frontend):
+Para levantar todos los servicios:
 
 ```bash
 docker compose up -d --build
 ```
 
+El frontend se ejecuta aparte:
+
+```bash
+cd ../frontend
+npm run dev
+```
+
 Los puertos locales se pueden cambiar sin editar el compose:
 `MYSQL_HOST_PORT=3307` y `PHPMYADMIN_PORT=8081`.
 
-> MySQL y phpMyAdmin están publicados solo en `127.0.0.1`. No los expongas
-> directamente a Internet en producción.
+> MySQL y phpMyAdmin estan publicados solo en `127.0.0.1`. No los expongas
+> directamente a Internet en produccion.
 
 ## Configuración manual (sin Docker)
 
