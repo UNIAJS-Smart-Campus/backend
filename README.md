@@ -94,3 +94,9 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
 Solo Caddy publica 80/443; MySQL y Elasticsearch quedan en la red interna.
+
+## Autores y colaboradores
+
+- [ValeriaOsp](https://github.com/ValeriaOsp)
+- [Greys1512](https://github.com/Greys1512)
+- [felipeguevaram3-collab](https://github.com/felipeguevaram3-collab)
