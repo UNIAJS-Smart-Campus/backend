@@ -51,9 +51,51 @@ const dbOptions = {
 
 // ------------------------------------------------------------
 // 3) Semilla de la base. En docker-compose lo hace el contenedor
-//    db-init; aquí lo hace el propio proceso: si la tabla
-//    `usuarios` no existe, importa uajs_smart_campus.sql.
+//    db-init; aquí lo hace el propio proceso.
+//
+//    Flujo por intento:
+//      a) contar objetos del dump (CREATE TABLE/VIEW) vs. los que
+//         existen realmente en el esquema;
+//      b) si todo está -> listo;
+//      c) si hay una importación PARCIAL -> limpiar el esquema y
+//         volver a importar (un dump a medias deja la API rota
+//         de formas difíciles de depurar);
+//      d) si está vacío -> importar.
 // ------------------------------------------------------------
+
+// phpMyAdmin emite los contadores como:
+//   ALTER TABLE `x`
+//     MODIFY `col` ... AUTO_INCREMENT=N;
+// TiDB rechaza el MODIFY de columna con AUTO_INCREMENT
+// ("Unsupported modify column: can't set auto_increment") y el
+// CREATE TABLE del dump no trae la columna con auto_increment, así
+// que simple eliminarlo dejaría la app sin ids automáticos.
+// seed-sql.js reescribe el dump para TiDB (ver su cabecera).
+const { prepararSqlSemilla, contarObjetosDeclarados } = require('./seed-sql');
+
+async function limpiarEsquema(conexion, database) {
+    const [objetos] = await conexion.query(
+        `SELECT TABLE_NAME, TABLE_TYPE FROM information_schema.tables
+         WHERE table_schema = ?`,
+        [database]
+    );
+    if (objetos.length === 0) return;
+
+    console.warn(`[db] Importación parcial detectada (${objetos.length} objetos): limpiando esquema.`);
+    await conexion.query('SET foreign_key_checks = 0');
+    try {
+        // Las vistas primero: dependen de las tablas.
+        for (const o of objetos.filter((x) => x.TABLE_TYPE === 'VIEW')) {
+            await conexion.query(`DROP VIEW IF EXISTS \`${o.TABLE_NAME}\``);
+        }
+        for (const o of objetos.filter((x) => x.TABLE_TYPE !== 'VIEW')) {
+            await conexion.query(`DROP TABLE IF EXISTS \`${o.TABLE_NAME}\``);
+        }
+    } finally {
+        await conexion.query('SET foreign_key_checks = 1');
+    }
+}
+
 async function inicializarBaseDeDatos() {
     if (!dbOptions.host || !dbOptions.database) {
         console.warn('[db] DB_HOST/DB_NAME no definidos: se omite la semilla.');
@@ -61,6 +103,9 @@ async function inicializarBaseDeDatos() {
     }
 
     const semillaPath = path.resolve(__dirname, 'uajs_smart_campus.sql');
+    const dump = fs.readFileSync(semillaPath, 'utf8');
+    const sql = prepararSqlSemilla(dump);
+    const objetosEsperados = contarObjetosDeclarados(sql);
     const MAX_INTENTOS = 30;
 
     for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
@@ -73,19 +118,88 @@ async function inicializarBaseDeDatos() {
 
             const [filas] = await conexion.query(
                 `SELECT COUNT(*) AS n FROM information_schema.tables
-                 WHERE table_schema = ? AND table_name = 'usuarios'`,
+                 WHERE table_schema = ?`,
                 [dbOptions.database]
             );
+            const objetosActuales = Number(filas[0].n);
 
-            if (Number(filas[0].n) > 0) {
-                console.log('[db] Base de datos ya inicializada.');
+            // ¿Datos de la semilla presentes? (la tabla usuarios
+            // viene con 20 filas en uajs_smart_campus.sql)
+            let usuariosSemilla = 0;
+            if (objetosActuales > 0) {
+                try {
+                    const [u] = await conexion.query('SELECT COUNT(*) AS n FROM usuarios');
+                    usuariosSemilla = Number(u[0].n);
+                } catch {
+                    usuariosSemilla = 0; // tabla ausente o ilegible
+                }
+            }
+
+            // ¿La columna id de usuarios quedó AUTO_INCREMENT? Si no,
+            // el registro/login de la app falla con "Field 'id_usuario'
+            // doesn't have a default value" (estado que deja importar
+            // el dump de phpMyAdmin sin reescribir en TiDB).
+            let idsAutomaticos = false;
+            if (objetosActuales > 0) {
+                try {
+                    const [c] = await conexion.query(
+                        `SELECT EXTRA FROM information_schema.columns
+                         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'usuarios'
+                           AND COLUMN_NAME = 'id_usuario'`,
+                        [dbOptions.database]
+                    );
+                    idsAutomaticos = /auto_increment/i.test(c[0]?.EXTRA || '');
+                } catch {
+                    idsAutomaticos = false;
+                }
+            }
+
+            if (
+                objetosActuales >= objetosEsperados &&
+                usuariosSemilla > 0 &&
+                idsAutomaticos
+            ) {
+                console.log(
+                    `[db] Base de datos ya inicializada ` +
+                    `(${objetosActuales}/${objetosEsperados} objetos).`
+                );
                 return;
             }
 
-            console.log('[db] Importando uajs_smart_campus.sql ...');
-            const sql = fs.readFileSync(semillaPath, 'utf8');
+            // Estado intermedio -> no confiar en él: reconstruir.
+            if (objetosActuales > 0) {
+                const motivo =
+                    objetosActuales < objetosEsperados
+                        ? `objetos incompletos (${objetosActuales}/${objetosEsperados})`
+                        : !idsAutomaticos
+                            ? 'ids de usuarios sin AUTO_INCREMENT'
+                            : 'sin datos de semilla';
+                console.warn(`[db] Estado de la base inválido: ${motivo}.`);
+                await limpiarEsquema(conexion, dbOptions.database);
+            }
+
+            console.log(
+                `[db] Importando uajs_smart_campus.sql ` +
+                `(${objetosEsperados} objetos esperados) ...`
+            );
             await conexion.query(sql);
-            console.log('[db] Semilla importada correctamente.');
+
+            const [tras] = await conexion.query(
+                `SELECT COUNT(*) AS n FROM information_schema.tables
+                 WHERE table_schema = ?`,
+                [dbOptions.database]
+            );
+            const objetosFinales = Number(tras[0].n);
+            if (objetosFinales < objetosEsperados) {
+                throw new Error(
+                    `importación incompleta: ${objetosFinales}/${objetosEsperados} objetos`
+                );
+            }
+
+            console.log(
+                `[db] Semilla importada correctamente ` +
+                `(${objetosFinales}/${objetosEsperados} objetos).`
+            );
             return;
         } catch (error) {
             console.warn(`[db] Intento ${intento}/${MAX_INTENTOS} falló: ${error.message}`);
@@ -95,7 +209,7 @@ async function inicializarBaseDeDatos() {
         }
     }
 
-    console.error('[db] No se pudo inicializar la base de datos (se seguirá intentando por peticion).');
+    console.error('[db] No se pudo inicializar la base de datos (se reintentará en el próximo arranque).');
 }
 
 // ------------------------------------------------------------
