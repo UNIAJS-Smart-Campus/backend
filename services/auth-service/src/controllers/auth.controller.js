@@ -333,7 +333,11 @@ async function me(req, res, next) {
             [user.id]
         );
         if (!rows.length) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
+            // El token es válido pero el usuario ya no existe (cuenta eliminada
+            // o base reconstruida): se responde 401, no 404, para que el
+            // cliente lo trate como sesión inválida y cierre sesión en vez de
+            // quedarse con un token que hace fallar cada escritura.
+            return res.status(401).json({ error: 'La sesión ya no es válida' });
         }
         res.json({ data: rows[0] });
     } catch (error) {

@@ -104,8 +104,12 @@ tiempo de build: **tras cambiarlas hay que redesplegar** (Deployments →
   el middleware de reindexado ignora sus fallos.
 - **Plan free de Render**: la instancia se suspende por inactividad; la
   primera petición tras un rato puede tardar ~50 s.
-- **TiDB no aplica las foreign keys**: acepta la definición (14 FK) y las
-  muestra en `information_schema`, pero no las valida como MySQL.
+- **Las foreign keys se validan**: TiDB 8.5 sí aplica las 14 FK del dump. Un
+  `INSERT` con un `id_usuario` inexistente falla; por eso una sesión con el
+  token de un usuario ya eliminado (o de una base reconstruida) provoca error
+  en cualquier escritura. `/auth/me` responde 401 en ese caso y el frontend
+  cierra sesión. Si se reconstruye la base con usuarios dados de alta fuera de
+  la semilla, esos usuarios se pierden y deben volver a iniciar sesión.
 
 ## Mantenimiento rápido
 
