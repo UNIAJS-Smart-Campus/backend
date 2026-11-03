@@ -6,6 +6,20 @@
   "engines": {
     "node": ">=22"
   },
+  "workspaces": [
+    "gateway",
+    "services/auth-service",
+    "services/users-service",
+    "services/events-service",
+    "services/reservations-service",
+    "services/notifications-service",
+    "services/requests-service",
+    "services/resources-service",
+    "services/feedback-service",
+    "services/academic-info-service",
+    "services/configuration-service",
+    "services/search-service"
+  ],
   "scripts": {
     "dev": "docker compose up --build",
     "start": "docker compose up --build"

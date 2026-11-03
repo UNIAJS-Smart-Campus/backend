@@ -10,7 +10,13 @@ const pool = mysql.createPool({
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     waitForConnections: true,
-    connectionLimit: 10
+    connectionLimit: Number(process.env.DB_CONN_LIMIT) || 10,
+    // TLS opcional: bases de datos externas (p. ej. TiDB
+    // Serverless) exigen conexion cifrada. DB_SSL=1 activa TLS;
+    // DB_SSL_VERIFY=0 cifra sin validar el certificado.
+    ...(process.env.DB_SSL === '1'
+        ? { ssl: { rejectUnauthorized: process.env.DB_SSL_VERIFY !== '0' } }
+        : {})
 });
 
 module.exports = pool;

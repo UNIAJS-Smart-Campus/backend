@@ -1,0 +1,11 @@
+# No llevar al imagen: secretos, dependencias locales y artefactos.
+.git
+**/node_modules
+node_modules
+.env
+.env.prod
+docs
+deploy
+docker-compose*.yml
+*.md
+.nvmrc
