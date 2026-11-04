@@ -36,11 +36,19 @@ async function getAll(req, res, next) {
         );
 
         // El historial viaja anidado para no disparar una consulta por solicitud.
-        const [historial] = await pool.query(
-            `SELECT id_historial AS id, id_solicitud, tipo, estado, responsable, usuario, fecha, descripcion
-             FROM historial_solicitudes
-             ORDER BY fecha ASC, id_historial ASC`
-        );
+        // Solo se consultan las solicitudes visibles para este actor.
+        let historial = [];
+        if (rows.length > 0) {
+            const ids = rows.map((row) => row.id_solicitud);
+            const placeholders = ids.map(() => '?').join(', ');
+            [historial] = await pool.query(
+                `SELECT id_historial AS id, id_solicitud, tipo, estado, responsable, usuario, fecha, descripcion
+                 FROM historial_solicitudes
+                 WHERE id_solicitud IN (${placeholders})
+                 ORDER BY fecha ASC, id_historial ASC`,
+                ids
+            );
+        }
 
         const porSolicitud = new Map();
         for (const item of historial) {
