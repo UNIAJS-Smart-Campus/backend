@@ -7,6 +7,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 
 const routes = require('./config/routes');
 const authMiddleware = require('./middlewares/auth');
+const auditoriaMiddleware = require('./middlewares/auditoria');
 const reindexadoMiddleware = require('./middlewares/reindexado');
 
 const app = express();
@@ -61,7 +62,10 @@ const proxyFor = (service, prefix) => createProxyMiddleware({
 				proxyReq.setHeader('x-user-role', String(user.rol));
 				proxyReq.setHeader('x-user-identificacion', user.identificacion || '');
 			}
-		}
+		},
+		// Solo para las escrituras de administrador que el middleware de
+		// auditoría marcó: copia la respuesta para registrar qué cambió.
+		proxyRes: (proxyRes, req, res) => auditoriaMiddleware.capturarRespuesta(proxyRes, req, res)
 	}
 });
 
@@ -145,6 +149,11 @@ app.use('/api', apiLimiter);
 
 // Todo /api/* pasa por verificación de JWT salvo login y register.
 app.use('/api', authMiddleware);
+
+// Auditoría de acciones de administrador (tabla `auditoria`). Va después de
+// autenticar, porque necesita saber quién es el actor, y antes de autorizar,
+// para que un intento denegado (403) también quede registrado.
+app.use('/api', auditoriaMiddleware);
 
 // Autorización por rol. El JWT trae `rol` numérico:
 // 1 = Administrador, 2 = Estudiante, 3 = Docente, 4 = Administrativo.
