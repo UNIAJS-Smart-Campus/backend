@@ -197,6 +197,11 @@ async function revocarSesionPorRefreshToken(refreshToken) {
  * refresh token, invalida el anterior) y establece las cookies.
  */
 async function rotarSesion(refreshToken, res) {
+    if (!refreshToken) {
+        borrarCookiesSesion(res);
+        return res.status(401).json({ error: 'Sesión inválida o expirada' });
+    }
+
     const hash = hashToken(refreshToken);
     const [rows] = await pool.query(
         `SELECT sid, id_usuario FROM sesiones
