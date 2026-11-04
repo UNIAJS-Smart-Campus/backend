@@ -389,6 +389,90 @@ El modelo de roles se alineó con la especificación del documento (7. Usuarios 
 
 ---
 
+## 5. Seguridad
+
+### 5.1 Autenticación y sesiones
+
+| Medida | Implementación | Contra qué protege |
+|--------|---------------|-------------------|
+| **JWT obligatorio** | `JWT_SECRET` es obligatorio en gateway y auth-service. Sin él no arrancan. Sin fallback hardcodeado. | Firma de tokens válidos con clave pública del repositorio. |
+| **Access token de vida corta (30 min)** | `ACCESS_EXPIRES=30m`. Se renueva con refresh token. | Uso prolongado de un token robado. |
+| **Refresh token (7 días)** | `REFRESH_EXPIRES=7d`, hash SHA-256 en tabla `sesiones` (`sid`, `id_usuario`, `token_hash`, `revocada`, `expires_at`). | Renovación sin credenciales pero con caducidad. |
+| **Cookies HttpOnly** | `access_token` y `refresh_token` se establecen como cookies `HttpOnly`. JavaScript no puede leerlas. | **XSS**: robo de token desde `document.cookie`. |
+| **Cookies Secure + SameSite=None** | `COOKIE_SECURE=1` en Render (HTTPS). Solo viajan por HTTPS y en contexto cross-origin seguro. | Interceptación por red y envío desde sitios no seguros. |
+| **Nunca token en cuerpo de respuesta** | Login y refresh solo establecen cookies; el cuerpo devuelve datos del usuario, no el JWT. | Exposición en logs del navegador o redes. |
+| **Claim `sid` en el JWT** | Cada access JWT trae `sid` que apunta a una fila de `sesiones`. | Identificación y revocación de sesión concreta. |
+| **Rotación de refresh token** | Al renovar, se invalida el refresh anterior y se emite uno nuevo (nuevo `sid` y hash). | Reutilización de refresh token robado (reenvío). |
+| **Logout revoca en servidor** | `POST /auth/logout` marca `revocada=1` en `sesiones` y borra las cookies. Inmediato, no se espera a la expiración. | Token válido tras cerrar sesión (fallo original reportado). |
+| **Middleware de revocación en gateway** | Rechaza con 401 cualquier access JWT cuyo `sid` esté revocado o expirado. Caché en memoria TTL 5 s. | Token revocado sigue operando hasta expirar. |
+
+### 5.2 Control de acceso y autorización
+
+| Medida | Implementación |
+|--------|---------------|
+| **Verificación de JWT en gateway** | Todo `/api/*` requiere token válido, salvo login/register/refresh/logout. |
+| **Autorización por rol** | Reglas en `REGLAS_ROL`: solo rol 1 (Administrador) puede `POST/PUT/DELETE /api/users`; GET usuarios para roles 1 y 4. |
+| **`GET /api/audit` solo rol 1** | Devuelve 403 a cualquier rol que no sea Administrador. |
+| **`ProtectedRoute` en frontend** | Requiere `user` y `tienePermiso(permiso)`; si falla, redirige a `/dashboard`. |
+| **Menú filtrado por permisos** | Ítems de menú solo visibles si el rol tiene el `permiso`. |
+| **Validación de propiedad en servicios** | Cada microservicio comprueba que el actor sea dueño de la fila (p. ej. reserva propia) además del rol del gateway. |
+
+### 5.3 Protección contra ataques específicos
+
+| Ataque | Medida implementada |
+|--------|-------------------|
+| **Fuerza bruta en login** | Límite por cuenta: 10 fallos → bloqueo 15 min por cédula (además del límite por IP del gateway: 5/min). |
+| **Rate limiting general** | API: 300 req/min por IP. Recuperación: 3/min. Registro: 5/hora. Restablecer: 5/15 min. |
+| **Enumeración de usuarios** | Login responde el mismo mensaje genérico ("Credenciales inválidas") si el usuario no existe o la contraseña es errónea. |
+| **CSRF en mutaciones** | Middleware `csrfCheck`: POST/PUT/PATCH/DELETE cross-origin requieren header `Origin` que coincida con `CORS_ORIGINS`. |
+| **Suplantación de identidad** | Gateway borra headers `x-user-id`, `x-user-role`, `x-user-rol`, `x-user-identificacion` enviados por el cliente y los reescribe tras verificar el JWT. |
+| **Cabecera `x-powered-by`** | Desactivada. |
+| **IP real detrás de proxy** | `trust proxy` activado para leer `X-Forwarded-For` (rate limit y auditoría con IP real). |
+
+### 5.4 Datos sensibles
+
+| Dato | Protección |
+|------|-----------|
+| **Contraseñas** | Hash bcrypt (10 rounds). Nunca texto plano. Filas antiguas sin hash se rechazan en login. |
+| **Detalle de auditoría** | Se filtran campos sensibles (`password`, `contrasena`, `token`, `secret`, `jwt`, `autoriz`). Se acotan valores largos. Máximo 490 caracteres. Nunca se registra el hash de contraseña. |
+| **Token de restablecimiento de contraseña** | Hash SHA-256 en `usuarios.reset_token`, expira en 1 hora, se limpia tras usarse. El enlace del correo no revela si la cuenta existe. |
+| **Foto de perfil** | Almacenada como URL o base64 comprimida (512px JPEG). Nunca se envía sin procesar en auditoría. |
+
+### 5.5 Auditoría y trazabilidad
+
+| Medida | Implementación |
+|--------|---------------|
+| **Tabla `auditoria`** | Registra `id_usuario`, `accion` (CREAR/ACTUALIZAR/ELIMINAR/LOGIN), `entidad`, `id_entidad`, `detalle` (JSON con método, ruta exacta, estado HTTP, IP real, campos afectados). |
+| **Solo escrituras de admin** | Por defecto solo se audita rol 1 (configurable con `AUDITORIA_ROLES=1,4`). |
+| **Intento denegado se registra** | El middleware de auditoría va antes de la autorización, así que un 403 de administrador queda registrado. |
+| **Fire-and-forget** | Inserción asíncrona (eventos `finish`/`close`); nunca bloquea ni falla la petición original. |
+| **`GET /api/audit`** | Endpoint de lectura para el panel del administrador (rol 1), con detalle parseado y `limite` 1..200. |
+
+### 5.6 Frontend / cliente
+
+| Medida | Implementación |
+|--------|---------------|
+| **Ningún token accesible desde JS** | `getToken()` devuelve `null`; `setToken`/`clearToken` son no-op. El token vive solo en cookies HttpOnly. |
+| **`credentials: "include"`** | `apiFetch` envía las cookies HttpOnly en peticiones cross-origin (Vercel → Render). |
+| **Auto-refresh en 401** | `apiFetch` renueva con `/auth/refresh` y reintenta la petición (una sola vez, promise compartido). |
+| **Cierre de sesión ante 401/403/404** | Evento `uajs:sesion-expirada` cierra la sesión si el token ya no sirve. |
+| **Validación de sesión al recargar** | `/auth/me` silencioso al montar; cierra si el usuario está inactivo o el token es inválido. Errores de red no cierran la sesión. |
+| **Socket.IO por cookie** | El servidor lee `access_token` de la cookie del handshake HTTP (ya no se envía `auth.token`). |
+| **Sesión por inactividad** | `SessionGuard`: 10 min sin actividad → aviso; 2 min más → logout automático. |
+
+### 5.7 Variables de entorno de producción (Render)
+
+| Variable | Valor | Propósito |
+|----------|-------|-----------|
+| `JWT_SECRET` | (secreto generado) | Firma de JWT. |
+| `ACCESS_EXPIRES` | `30m` | Vida del access token. |
+| `REFRESH_EXPIRES` | `7d` | Vida del refresh token. |
+| `COOKIE_SECURE` | `1` | Cookies `Secure + SameSite=None` (HTTPS cross-origin). |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:4173,https://frontend-mu-mocha-67.vercel.app` | Orígenes permitidos para CORS con credenciales. |
+| `DB_SSL` | `1` | Conexión cifrada a TiDB Serverless. |
+
+---
+
 ## 4. Resumen ejecutivo
 
 | Área | Estado |
@@ -407,12 +491,16 @@ El modelo de roles se alineó con la especificación del documento (7. Usuarios 
 | Perfil | ✅ Implementada (vista 9) |
 | Dashboard de indicadores | ✅ Implementado (vista 10) |
 | Páginas con contenido real | ✅ Todas las páginas funcionales (sin placeholders) |
-| Backend funcional | ❌ Solo estructura |
-| Base de datos | ❌ No creada |
-| Autenticación/roles | ❌ No implementada |
+| Backend funcional | ✅ Desplegado en Render (microservicios + gateway all-in-one) |
+| Base de datos | ✅ TiDB Serverless (externo, SSL) |
+| Autenticación/roles | ✅ Implementada y desplegada |
+| Seguridad (cookies HttpOnly + refresh + revocación) | ✅ Implementada y desplegada |
+| Panel Actividad reciente (GET /api/audit) | ✅ Implementado y desplegado |
 | Hooks (useState/useEffect) | ✅ Usados en varias páginas |
-| Custom hooks | ✅ `useSearch` usado en Dashboard, Solicitudes y Eventos |
-| Despliegue Vercel + videomemoria | ❌ Pendiente |
+| Custom hooks | ✅ `useSearch` usado en Dashboard, Solicitudes, Eventos, Recursos, Reservas, Notificaciones y PQRS |
+| Despliegue frontend Vercel | ✅ Desplegado |
+| Despliegue backend Render | ✅ Desplegado |
+| Videomemoria | ❌ Pendiente |
 
 **Prioridad de trabajo recomendada:**
 1. ✅ Landing de acceso (vista 1) — implementada
@@ -421,5 +509,8 @@ El modelo de roles se alineó con la especificación del documento (7. Usuarios 
 4. ✅ Solicitudes + detalle con estados (vistas 4 y 5) — implementadas
 5. ✅ Reservas, Eventos, Notificaciones, Perfil (vistas 6-9) — implementadas
 6. ✅ Dashboard de indicadores (vista 10) — implementado
-7. Backend con MySQL, API REST y autenticación
-8. Despliegue en Vercel y videomemoria
+7. ✅ Backend con TiDB, API REST y autenticación — desplegado
+8. ✅ Seguridad (cookies HttpOnly, refresh, revocación) — desplegado
+9. ✅ Panel Actividad reciente — desplegado
+10. Videomemoria (10 min, MP4) — pendiente
+11. Archivo TXT con URL de Vercel — pendiente
