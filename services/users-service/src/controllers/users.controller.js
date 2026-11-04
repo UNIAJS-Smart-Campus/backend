@@ -85,7 +85,22 @@ async function update(req, res, next) {
             telefono, id_rol, tipo_usuario, programa, cargo, campus, estado, foto_perfil
         } = req.body;
 
-        if (!nombre || !correo || !usuario) {
+        // Se permite actualizar solo algunos campos (p. ej. la foto de perfil
+        // desde Configuración). Lo que no llega se conserva de la fila actual.
+        const [actual] = await pool.query(
+            `SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`,
+            [id]
+        );
+        if (!actual.length) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        const previo = actual[0];
+
+        const finalNombre = nombre ?? previo.nombre;
+        const finalCorreo = correo ?? previo.correo;
+        const finalUsuario = usuario ?? previo.usuario;
+
+        if (!finalNombre || !finalCorreo || !finalUsuario) {
             return res.status(400).json({ error: 'Faltan campos requeridos' });
         }
 
@@ -96,9 +111,19 @@ async function update(req, res, next) {
             'cargo = ?', 'campus = ?', 'foto_perfil = ?', 'estado = ?'
         ];
         const valores = [
-            nombre, apellido || '', correo, usuario, cedula || null,
-            telefono || '', id_rol || 2, tipo_usuario || 'Estudiante', programa || '',
-            cargo || '', campus || 'Campus principal', foto_perfil || null, estado || 'Activo'
+            finalNombre,
+            apellido ?? previo.apellido ?? '',
+            finalCorreo,
+            finalUsuario,
+            cedula ?? previo.cedula ?? null,
+            telefono ?? previo.telefono ?? '',
+            id_rol ?? previo.id_rol ?? 2,
+            tipo_usuario ?? previo.tipo_usuario ?? 'Estudiante',
+            programa ?? previo.programa ?? '',
+            cargo ?? previo.cargo ?? '',
+            campus ?? previo.campus ?? 'Campus principal',
+            foto_perfil ?? previo.foto_perfil ?? null,
+            estado ?? previo.estado ?? 'Activo'
         ];
 
         if (password) {

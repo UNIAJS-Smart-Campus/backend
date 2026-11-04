@@ -28,6 +28,49 @@ function segundosBloqueo(clave) {
     return Math.ceil((estado.hasta - Date.now()) / 1000);
 }
 
+// Etiqueta legible del dispositivo a partir del User-Agent (sin dependencias).
+function etiquetaDispositivo(agente = '') {
+    const ua = String(agente);
+    const navegador = /Edg\//.test(ua) ? 'Edge'
+        : /OPR\/|Opera/.test(ua) ? 'Opera'
+            : /Chrome\//.test(ua) ? 'Chrome'
+                : /Firefox\//.test(ua) ? 'Firefox'
+                    : /Safari\//.test(ua) ? 'Safari'
+                        : 'Navegador';
+    const sistema = /Android/.test(ua) ? 'Android'
+        : /iPhone|iPad|iPod/.test(ua) ? 'iOS'
+            : /Windows/.test(ua) ? 'Windows'
+                : /Mac OS X/.test(ua) ? 'macOS'
+                    : /Linux/.test(ua) ? 'Linux'
+                        : 'Sistema desconocido';
+    return `${navegador} · ${sistema}`;
+}
+
+/**
+ * Deja constancia del inicio de sesión en la tabla `auditoria` (que hasta
+ * ahora no se usaba). Se guarda solo lo necesario para mostrarlo en
+ * Configuración → Seguridad: dispositivo e IP. Nunca bloquea el login.
+ */
+async function registrarAcceso(usuario, req) {
+    try {
+        const ip = String(req.headers['x-forwarded-for'] || req.ip || '')
+            .split(',')[0]
+            .trim();
+        const detalle = JSON.stringify({
+            dispositivo: etiquetaDispositivo(req.headers['user-agent']),
+            ip
+        }).slice(0, 500);
+
+        await pool.query(
+            `INSERT INTO auditoria (id_usuario, accion, entidad, detalle)
+             VALUES (?, 'LOGIN', 'sesion', ?)`,
+            [usuario.id_usuario, detalle]
+        );
+    } catch (error) {
+        console.warn('[auth] no se pudo registrar el acceso:', error.message);
+    }
+}
+
 function registrarFalloLogin(clave) {
     const estado = intentosLogin.get(clave);
     const fallos = (estado?.fallos || 0) + 1;
@@ -131,6 +174,8 @@ async function login(req, res, next) {
         userSafe.identificacion = user.identificacion;
         userSafe.rol = user.id_rol;
         userSafe.token = token;
+
+        await registrarAcceso(user, req);
 
         res.json({ data: userSafe });
     } catch (error) {
@@ -329,7 +374,7 @@ async function me(req, res, next) {
     try {
         const user = req.user;
         const [rows] = await pool.query(
-            'SELECT id_usuario, nombre, apellido, correo, id_rol, tipo_usuario, programa, cargo, foto_perfil, estado FROM usuarios WHERE id_usuario = ?',
+            'SELECT id_usuario, identificacion, usuario, cedula, nombre, apellido, correo, telefono, id_rol, tipo_usuario, programa, cargo, campus, foto_perfil, estado FROM usuarios WHERE id_usuario = ?',
             [user.id]
         );
         if (!rows.length) {
@@ -345,4 +390,42 @@ async function me(req, res, next) {
     }
 }
 
-module.exports = { login, register, recuperar, restablecer, me };
+/**
+ * GET /auth/accesos
+ * Últimos inicios de sesión del usuario autenticado. Alimenta la sección
+ * Configuración → Seguridad → "Sesiones y dispositivos" con datos reales
+ * de la tabla `auditoria` (antes esa lista era fija en el frontend).
+ */
+async function accesos(req, res, next) {
+    try {
+        const [rows] = await pool.query(
+            `SELECT id_auditoria, detalle, fecha
+             FROM auditoria
+             WHERE id_usuario = ? AND accion = 'LOGIN'
+             ORDER BY fecha DESC, id_auditoria DESC
+             LIMIT 10`,
+            [req.user.id]
+        );
+
+        const data = rows.map((fila) => {
+            let detalle = {};
+            try {
+                detalle = JSON.parse(fila.detalle || '{}');
+            } catch {
+                // Detalle antiguo en texto plano: se deja vacío.
+            }
+            return {
+                id: fila.id_auditoria,
+                dispositivo: detalle.dispositivo || 'Dispositivo desconocido',
+                ip: detalle.ip || '',
+                fecha: fila.fecha
+            };
+        });
+
+        res.json({ data });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { login, register, recuperar, restablecer, me, accesos };

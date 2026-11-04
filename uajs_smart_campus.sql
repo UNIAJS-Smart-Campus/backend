@@ -476,7 +476,7 @@ CREATE TABLE `usuarios` (
   `programa` varchar(120) DEFAULT '',
   `cargo` varchar(120) DEFAULT '',
   `campus` varchar(80) DEFAULT 'Campus principal',
-  `foto_perfil` varchar(255) DEFAULT NULL,
+  `foto_perfil` mediumtext DEFAULT NULL,
   `estado` varchar(20) NOT NULL DEFAULT 'Activo',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
