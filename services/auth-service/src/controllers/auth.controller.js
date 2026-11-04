@@ -139,8 +139,9 @@ async function login(req, res, next) {
         }
 
         const [rows] = await pool.query(
-            `SELECT id_usuario, identificacion, usuario, nombre, apellido, correo, id_rol,
-                    tipo_usuario, programa, cargo, contraseña, foto_perfil, estado
+            `SELECT id_usuario, identificacion, usuario, cedula, nombre, apellido, correo,
+                    telefono, id_rol, tipo_usuario, programa, cargo, campus,
+                    contraseña, foto_perfil, estado
              FROM usuarios
              WHERE cedula IS NOT NULL
                AND (
@@ -240,7 +241,7 @@ async function register(req, res, next) {
         );
 
         const [newUser] = await pool.query(
-            'SELECT id_usuario, identificacion, usuario, nombre, apellido, correo, id_rol, tipo_usuario, programa, cargo, estado FROM usuarios WHERE id_usuario = ?',
+            'SELECT id_usuario, identificacion, usuario, cedula, nombre, apellido, correo, telefono, id_rol, tipo_usuario, programa, cargo, campus, foto_perfil, estado FROM usuarios WHERE id_usuario = ?',
             [result.insertId]
         );
         res.status(201).json({ data: newUser[0] });
