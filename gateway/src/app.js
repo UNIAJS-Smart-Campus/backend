@@ -197,6 +197,35 @@ function autorizar(req, res, next) {
 
 app.use('/api', autorizar);
 
+// ------------------------------------------------------------------
+// GET /api/audit — panel "Actividad reciente" del administrador.
+//
+// Contrato:
+//   - Auth: Bearer JWT con rol 1 (Administrador). 401 sin token, 403 si
+//     el rol no es administrador, 503 si la base no está disponible.
+//   - Query: ?limite=N (opcional; se recorta a 1..200, defecto 50).
+//   - 200 -> { data: [{ id, id_usuario, usuario, nombre, accion, entidad,
+//     id_entidad, detalle (JSON parseado), fecha }] } de más reciente a
+//     más antigua.
+//
+// Vive en el gateway (y no en un microservicio) porque el gateway es el
+// único componente que ya escribe `auditoria` y su pool está en
+// auditoria.js: la tabla no tiene otro dueño natural.
+// ------------------------------------------------------------------
+app.get('/api/audit', (req, res) => {
+	if (Number(req.user?.rol) !== 1) {
+		return res.status(403).json({ error: 'Solo el administrador puede consultar la actividad' });
+	}
+
+	auditoriaMiddleware
+		.consultarActividad(req.query.limite)
+		.then((data) => res.json({ data }))
+		.catch((error) => {
+			console.warn(`[auditoria] no se pudo leer la actividad: ${error.message}`);
+			res.status(503).json({ error: 'No se pudo leer la actividad. Intenta más tarde.' });
+		});
+});
+
 // Socket.IO: el upgrade viaja al notifications-service. La autenticación del
 // handshake la hace ese servicio con el JWT que envía el cliente en `auth`.
 // Socket.IO: el upgrade viaja al notifications-service. Se usa pathFilter

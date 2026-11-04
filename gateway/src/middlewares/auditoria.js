@@ -175,6 +175,56 @@ async function guardarAuditoria(fila) {
 }
 
 /**
+ * Interpreta `auditoria.detalle`: todas las filas nuevas guardan JSON, pero
+ * se tolera texto plano de registros antiguos (se devuelve tal cual).
+ */
+function parsearDetalle(texto) {
+    if (typeof texto !== 'string') return texto ?? null;
+    try {
+        return JSON.parse(texto);
+    } catch {
+        return texto;
+    }
+}
+
+/**
+ * Lectura para el panel "Actividad reciente" (GET /api/audit): últimas filas
+ * de `auditoria` de más reciente a más antigua, con el nombre del actor
+ * (join con `usuarios`) y el detalle ya parseado.
+ *
+ * `limite` se recorta a 1..200 (50 por defecto): es una lectura para una
+ * vista, no un export, así que no tiene sentido pedir miles de filas.
+ */
+async function consultarActividad(limite) {
+    const conexion = obtenerPool();
+    if (!conexion) {
+        throw new Error('auditoría no configurada (faltan variables DB_*)');
+    }
+
+    const tope = Math.min(Math.max(Number.parseInt(limite, 10) || 50, 1), 200);
+    const [filas] = await conexion.query(
+        `SELECT a.id_auditoria AS id,
+                a.id_usuario,
+                u.usuario,
+                TRIM(CONCAT(IFNULL(u.nombre, ''), ' ', IFNULL(u.apellido, ''))) AS nombre,
+                a.accion,
+                a.entidad,
+                a.id_entidad,
+                a.detalle,
+                a.fecha
+           FROM auditoria a
+           LEFT JOIN usuarios u ON u.id_usuario = a.id_usuario
+          ORDER BY a.id_auditoria DESC
+          LIMIT ${tope}`
+    );
+
+    return filas.map((fila) => ({
+        ...fila,
+        detalle: parsearDetalle(fila.detalle)
+    }));
+}
+
+/**
  * Middleware: registra en la tabla `auditoria` toda escritura (POST, PUT,
  * PATCH, DELETE) que realiza un usuario administrador a través del API.
  *
@@ -258,3 +308,4 @@ function capturarRespuesta(proxyRes, req, res) {
 
 module.exports = auditoriaMiddleware;
 module.exports.capturarRespuesta = capturarRespuesta;
+module.exports.consultarActividad = consultarActividad;
