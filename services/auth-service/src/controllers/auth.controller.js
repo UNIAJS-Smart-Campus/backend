@@ -323,15 +323,34 @@ async function login(req, res, next) {
                     telefono, id_rol, tipo_usuario, programa, cargo, campus,
                     contraseña, foto_perfil, estado
              FROM usuarios
-             WHERE cedula IS NOT NULL
-               AND (
-                   cedula = ?
-                   OR REPLACE(REPLACE(REPLACE(cedula, '.', ''), '-', ''), ' ', '') = ?
+             WHERE (
+                   usuario = ?
+                   OR identificacion = ?
+                   OR (
+                       cedula IS NOT NULL
+                       AND (
+                           cedula = ?
+                           OR REPLACE(REPLACE(REPLACE(cedula, '.', ''), '-', ''), ' ', '') = ?
+                       )
+                   )
                )
                AND estado = ?
-             ORDER BY CASE WHEN cedula = ? THEN 0 ELSE 1 END
+             ORDER BY CASE
+                 WHEN usuario = ? OR identificacion = ? THEN 0
+                 WHEN cedula = ? THEN 1
+                 ELSE 2
+             END
              LIMIT 1`,
-            [criterio, documentoBuscado, 'Activo', criterio]
+            [
+                criterio,
+                criterio,
+                criterio,
+                documentoBuscado,
+                'Activo',
+                criterio,
+                criterio,
+                criterio
+            ]
         );
 
         const user = rows[0];
