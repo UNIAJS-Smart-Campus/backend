@@ -6,6 +6,23 @@ const { correoConfigurado, enviarRecuperacion } = require('../config/mailer');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '24h';
+// Access JWT: TTL corto (default 30 min) para limitar el daño de un token
+// robado. Se renueva silenciosamente con el refresh token.
+// Refresh token: 7 días por defecto, almacenado con hash en `sesiones` para
+// permitir revocación inmediata (logout o fuerza bruta).
+const ACCESS_EXPIRES = process.env.ACCESS_EXPIRES || '30m';
+const REFRESH_EXPIRES = process.env.REFRESH_EXPIRES || '7d';
+// Cookies HttpOnly: en producción (HTTPS) van con Secure + SameSite=None para
+// que viajen cross-origin (front en Vercel, API en Render). En desarrollo
+// (HTTP) van con SameSite=Lax y sin Secure.
+const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
+const COOKIE_SAMESITE = COOKIE_SECURE ? 'none' : 'lax';
+const COOKIE_OPTIONS_BASE = {
+    httpOnly: true,
+    secure: COOKIE_SECURE,
+    sameSite: COOKIE_SAMESITE,
+    path: '/'
+};
 const SALT_ROUNDS = 10;
 
 // Anti fuerza bruta por cuenta: además del límite por IP del gateway, una
@@ -91,6 +108,163 @@ function hashToken(token) {
     return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+function generarSid() {
+    return crypto.randomBytes(16).toString('hex');
+}
+
+function generarRefreshToken() {
+    return crypto.randomBytes(48).toString('hex');
+}
+
+/**
+ * Convierte '30m', '7d', '24h' o un número a segundos.
+ */
+function ttlSegundos(texto) {
+    const match = String(texto).match(/^(\d+)\s*([smhd]?)$/i);
+    if (!match) return Number(texto) || 0;
+    const valor = Number(match[1]);
+    const unidad = (match[2] || 's').toLowerCase();
+    const porUnidad = { s: 1, m: 60, h: 3600, d: 86400 };
+    return valor * (porUnidad[unidad] || 1);
+}
+
+function cookieDe(req, nombre) {
+    const cookies = req.headers.cookie || '';
+    const match = cookies.match(new RegExp('(?:^|;\\s*)' + nombre + '=([^;]+)'));
+    return match ? match[1] : null;
+}
+
+/**
+ * Establece las cookies HttpOnly de access y refresh token.
+ * Nunca se envían los tokens en el cuerpo de la respuesta.
+ */
+function establecerCookiesSesion(res, accessToken, refreshToken) {
+    res.cookie('access_token', accessToken, {
+        ...COOKIE_OPTIONS_BASE,
+        maxAge: ttlSegundos(ACCESS_EXPIRES) * 1000
+    });
+    res.cookie('refresh_token', refreshToken, {
+        ...COOKIE_OPTIONS_BASE,
+        maxAge: ttlSegundos(REFRESH_EXPIRES) * 1000
+    });
+}
+
+/**
+ * Borra las cookies de sesión del cliente.
+ */
+function borrarCookiesSesion(res) {
+    const clearOpts = { path: '/', ...(COOKIE_SECURE ? { secure: true, sameSite: 'none' } : {}) };
+    res.clearCookie('access_token', clearOpts);
+    res.clearCookie('refresh_token', clearOpts);
+}
+
+/**
+ * Guarda (o actualiza) una sesión de refresh en la tabla `sesiones`.
+ */
+async function guardarSesion(sid, idUsuario, refreshToken, expires) {
+    await pool.query(
+        `INSERT INTO sesiones (sid, id_usuario, token_hash, expires_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash), expires_at = VALUES(expires_at), revocada = 0`,
+        [sid, idUsuario, hashToken(refreshToken), expires]
+    );
+}
+
+async function revocarSesionPorSid(sid) {
+    if (!sid) return false;
+    const [r] = await pool.query(
+        'UPDATE sesiones SET revocada = 1 WHERE sid = ? AND revocada = 0',
+        [sid]
+    );
+    return (r.affectedRows || 0) > 0;
+}
+
+async function revocarSesionPorRefreshToken(refreshToken) {
+    if (!refreshToken) return false;
+    const hash = hashToken(refreshToken);
+    const [rows] = await pool.query(
+        'SELECT sid FROM sesiones WHERE token_hash = ? AND revocada = 0 AND expires_at > NOW() LIMIT 1',
+        [hash]
+    );
+    if (!rows.length) return false;
+    await pool.query('UPDATE sesiones SET revocada = 1 WHERE sid = ?', [rows[0].sid]);
+    return true;
+}
+
+/**
+ * Renueva el par de tokens: valida el refresh token, rota (nuevo sid, nuevo
+ * refresh token, invalida el anterior) y establece las cookies.
+ */
+async function rotarSesion(refreshToken, res) {
+    const hash = hashToken(refreshToken);
+    const [rows] = await pool.query(
+        `SELECT sid, id_usuario FROM sesiones
+         WHERE token_hash = ? AND revocada = 0 AND expires_at > NOW()
+         LIMIT 1`,
+        [hash]
+    );
+    if (!rows.length) {
+        borrarCookiesSesion(res);
+        return res.status(401).json({ error: 'Sesión inválida o expirada' });
+    }
+    const { sid, id_usuario } = rows[0];
+
+    // Rotar: invalido el refresh token actual.
+    await pool.query('UPDATE sesiones SET revocada = 1 WHERE sid = ?', [sid]);
+
+    const nuevoSid = generarSid();
+    const nuevoRefresh = generarRefreshToken();
+    const expira = new Date(Date.now() + ttlSegundos(REFRESH_EXPIRES) * 1000);
+
+    const [usuarios] = await pool.query(
+        'SELECT id_usuario, identificacion, id_rol FROM usuarios WHERE id_usuario = ?',
+        [id_usuario]
+    );
+    const usuario = usuarios[0];
+    if (!usuario) {
+        borrarCookiesSesion(res);
+        return res.status(401).json({ error: 'Usuario no encontrado' });
+    }
+
+    const accessToken = jwt.sign(
+        { id: usuario.id_usuario, identificacion: usuario.identificacion, rol: usuario.id_rol, sid: nuevoSid },
+        JWT_SECRET,
+        { expiresIn: ACCESS_EXPIRES }
+    );
+
+    await guardarSesion(nuevoSid, id_usuario, nuevoRefresh, expira);
+    establecerCookiesSesion(res, accessToken, nuevoRefresh);
+    return res.json({ data: { mensaje: 'Sesión renovada' } });
+}
+
+/**
+ * Cierra la sesión: revoca en la tabla `sesiones` y borra las cookies.
+ */
+async function cerrarSesion(req, res) {
+    const refreshToken = cookieDe(req, 'refresh_token');
+    let revocado = await revocarSesionPorRefreshToken(refreshToken);
+
+    // Fallback: si no hay refresh token válido, intentar por el access token
+    // (su sid permite revocar la sesión aunque el JWT ya haya expirado).
+    if (!revocado) {
+        const accessToken = cookieDe(req, 'access_token');
+        if (accessToken) {
+            try {
+                const decoded = jwt.verify(accessToken, JWT_SECRET);
+                if (decoded.sid) {
+                    await revocarSesionPorSid(decoded.sid);
+                    revocado = true;
+                }
+            } catch {
+                // Token expirado o inválido: no hay nada que revocar.
+            }
+        }
+    }
+
+    borrarCookiesSesion(res);
+    return res.json({ data: { mensaje: 'Sesión cerrada' } });
+}
+
 if (!JWT_SECRET) {
     throw new Error(
         'JWT_SECRET no está definido. Defínelo en el .env antes de arrancar auth-service.'
@@ -165,18 +339,24 @@ async function login(req, res, next) {
 
         intentosLogin.delete(clave);
 
+        const sid = generarSid();
         const token = jwt.sign(
-            { id: user.id_usuario, identificacion: user.identificacion, rol: user.id_rol },
+            { id: user.id_usuario, identificacion: user.identificacion, rol: user.id_rol, sid },
             JWT_SECRET,
-            { expiresIn: JWT_EXPIRES }
+            { expiresIn: ACCESS_EXPIRES }
         );
+
+        const refreshToken = generarRefreshToken();
+        const expira = new Date(Date.now() + ttlSegundos(REFRESH_EXPIRES) * 1000);
+        await guardarSesion(sid, user.id_usuario, refreshToken, expira);
+
+        await registrarAcceso(user, req);
+
+        establecerCookiesSesion(res, token, refreshToken);
 
         const { contraseña, ...userSafe } = user;
         userSafe.identificacion = user.identificacion;
         userSafe.rol = user.id_rol;
-        userSafe.token = token;
-
-        await registrarAcceso(user, req);
 
         res.json({ data: userSafe });
     } catch (error) {
@@ -429,4 +609,40 @@ async function accesos(req, res, next) {
     }
 }
 
-module.exports = { login, register, recuperar, restablecer, me, accesos };
+/**
+ * POST /auth/refresh
+ * Renueva el access token usando la cookie de refresh token. Rota el par:
+ * invalida el refresh actual y emite uno nuevo. Nunca devuelve tokens en el
+ * cuerpo (viajan en cookies HttpOnly).
+ */
+async function refresh(req, res, next) {
+    try {
+        await rotarSesion(cookieDe(req, 'refresh_token'), res);
+    } catch (error) {
+        next(error);
+    }
+}
+
+/**
+ * POST /auth/logout
+ * Revoca la sesión en la tabla `sesiones` y borra las cookies. El token deja
+ * de ser válido inmediatamente (no hay que esperar a que expire).
+ */
+async function logout(req, res, next) {
+    try {
+        await cerrarSesion(req, res);
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = {
+    login,
+    register,
+    recuperar,
+    restablecer,
+    me,
+    accesos,
+    refresh,
+    logout
+};

@@ -35,8 +35,18 @@ function initRealtime(httpServer) {
         }
 
         const header = socket.handshake.headers?.authorization;
-        const token = socket.handshake.auth?.token
+        let token = socket.handshake.auth?.token
             || (header && header.startsWith('Bearer ') ? header.slice(7) : null);
+
+        // Fallback: leer access_token de la cookie HttpOnly del handshake.
+        // El cliente ya no puede incluir auth.token (el token no es accesible
+        // desde JavaScript: vive en cookie HttpOnly). El navegador envía la
+        // cookie automáticamente en el handshake HTTP de Socket.IO.
+        if (!token) {
+            const cookies = socket.handshake.headers?.cookie || '';
+            const match = cookies.match(/(?:^|;\s*)access_token=([^;]+)/);
+            if (match) token = match[1];
+        }
 
         if (!token) {
             return next(new Error('Token requerido'));

@@ -8,6 +8,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
 const routes = require('./config/routes');
 const authMiddleware = require('./middlewares/auth');
 const auditoriaMiddleware = require('./middlewares/auditoria');
+const { sesionMiddleware } = require('./middlewares/sesiones');
 const reindexadoMiddleware = require('./middlewares/reindexado');
 
 const app = express();
@@ -26,8 +27,14 @@ const ORIGENES_PERMITIDOS = (process.env.CORS_ORIGINS || 'http://localhost:5173,
 
 app.use(cors({
 	origin: (origin, callback) => callback(null, !origin || ORIGENES_PERMITIDOS.includes(origin)),
+	// credentials: true permite que el navegador envíe las cookies HttpOnly
+	// (access_token / refresh_token) en peticiones cross-origin y que el
+	// servidor responda con Access-Control-Allow-Credentials: true.
+	credentials: true,
 	methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-	allowedHeaders: ['Content-Type', 'Authorization']
+	// 'Cookie' se lista por claridad; las cookies viajan automáticamente con
+	// credentials: true y no hacen falta en allowedHeaders.
+	allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
 }));
 
 // El cliente nunca puede dictar su identidad: el gateway la escribe después
@@ -65,7 +72,19 @@ const proxyFor = (service, prefix) => createProxyMiddleware({
 		},
 		// Solo para las escrituras de administrador que el middleware de
 		// auditoría marcó: copia la respuesta para registrar qué cambió.
-		proxyRes: (proxyRes, req, res) => auditoriaMiddleware.capturarRespuesta(proxyRes, req, res)
+		proxyRes: (proxyRes, req, res) => {
+			// Reenviar Set-Cookie (login / refresh establecen cookies
+			// HttpOnly) para que el navegador las guarde.
+			// http-proxy-middleware no lo hace por defecto.
+			const cookies = proxyRes.headers['set-cookie'];
+			if (cookies) {
+				res.setHeader(
+					'set-cookie',
+					Array.isArray(cookies) ? cookies : [cookies]
+				);
+			}
+			auditoriaMiddleware.capturarRespuesta(proxyRes, req, res);
+		}
 	}
 });
 
@@ -147,8 +166,32 @@ const apiLimiter = rateLimit({
 
 app.use('/api', apiLimiter);
 
-// Todo /api/* pasa por verificación de JWT salvo login y register.
+// CSRF por origen: las mutaciones cross-origin deben traer un header Origin
+// que coincida con CORS_ORIGINS. Las peticiones de misma origen no traen
+// Origin y se dejan pasar. Se aplica a POST/PUT/PATCH/DELETE (incluye
+// login, refresh y logout).
+function csrfCheck(req, res, next) {
+    const mutacion = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+    if (!mutacion) return next();
+    const origen = req.headers.origin;
+    // Sin Origin (misma origen o cliente que no lo envía): no es cross-origin,
+    // no hay CSRF que prevenir.
+    if (!origen) return next();
+    if (!ORIGENES_PERMITIDOS.includes(origen)) {
+        return res.status(403).json({ error: 'Origen no permitido' });
+    }
+    next();
+}
+
+// Todo /api/* pasa por verificación de JWT salvo login, register, refresh y
+// logout (estos dos son puntos de entrada para renovar o cerrar sesión).
+app.use('/api', csrfCheck);
 app.use('/api', authMiddleware);
+
+// Comprobación de revocación de sesión: rechaza (401) los access JWT cuyo
+// sid esté revocado o expirado en la tabla `sesiones`. Va tras autenticar y
+// antes de autorizar, para que una sesión revocada no siga operando.
+app.use('/api', sesionMiddleware);
 
 // Auditoría de acciones de administrador (tabla `auditoria`). Va después de
 // autenticar, porque necesita saber quién es el actor, y antes de autorizar,

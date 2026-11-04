@@ -513,6 +513,23 @@ INSERT INTO `usuarios` (`id_usuario`, `identificacion`, `usuario`, `cedula`, `co
 -- --------------------------------------------------------
 
 --
+-- Estructura para la tabla `sesiones`
+-- (refresh tokens: hash del token, bandera de revocación y expiración;
+--  permite invalidar una sesión antes de que expire el access token)
+--
+CREATE TABLE `sesiones` (
+  `id` int NOT NULL,
+  `sid` varchar(128) NOT NULL,
+  `id_usuario` int NOT NULL,
+  `token_hash` char(64) NOT NULL,
+  `revocada` tinyint(1) NOT NULL DEFAULT '0',
+  `expires_at` datetime NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura Stand-in para la vista `v_reservas_detalle`
 -- (Véase abajo para la vista actual)
 --
@@ -787,6 +804,12 @@ ALTER TABLE `usuarios`
   MODIFY `id_usuario` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
 
 --
+-- AUTO_INCREMENT de la tabla `sesiones`
+--
+ALTER TABLE `sesiones`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- Restricciones para tablas volcadas
 --
 
@@ -853,6 +876,21 @@ ALTER TABLE `solicitudes`
 --
 ALTER TABLE `usuarios`
   ADD CONSTRAINT `fk_usuarios_rol` FOREIGN KEY (`id_rol`) REFERENCES `roles` (`id_rol`);
+
+--
+-- Índices de la tabla `sesiones`
+--
+ALTER TABLE `sesiones`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_sesiones_sid` (`sid`),
+  ADD KEY `idx_sesiones_usuario` (`id_usuario`),
+  ADD KEY `idx_sesiones_expira` (`expires_at`);
+
+--
+-- Filtros para la tabla `sesiones`
+--
+ALTER TABLE `sesiones`
+  ADD CONSTRAINT `fk_sesiones_usuario` FOREIGN KEY (`id_usuario`) REFERENCES `usuarios` (`id_usuario`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
