@@ -73,6 +73,14 @@ const proxyFor = (service, prefix) => createProxyMiddleware({
 		// Solo para las escrituras de administrador que el middleware de
 		// auditoría marcó: copia la respuesta para registrar qué cambió.
 		proxyRes: (proxyRes, req, res) => {
+			// El gateway es el único componente público y ya emite los
+			// encabezados CORS correctos. No reenviar los wildcard de los
+			// microservicios, incompatibles con credentials: true.
+			delete proxyRes.headers['access-control-allow-origin'];
+			delete proxyRes.headers['access-control-allow-credentials'];
+			delete proxyRes.headers['access-control-allow-methods'];
+			delete proxyRes.headers['access-control-allow-headers'];
+			delete proxyRes.headers['access-control-expose-headers'];
 			// Reenviar Set-Cookie (login / refresh establecen cookies
 			// HttpOnly) para que el navegador las guarde.
 			// http-proxy-middleware no lo hace por defecto.

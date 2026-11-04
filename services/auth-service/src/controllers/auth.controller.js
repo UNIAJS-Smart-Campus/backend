@@ -15,7 +15,8 @@ const REFRESH_EXPIRES = process.env.REFRESH_EXPIRES || '7d';
 // Cookies HttpOnly: en producción (HTTPS) van con Secure + SameSite=None para
 // que viajen cross-origin (front en Vercel, API en Render). En desarrollo
 // (HTTP) van con SameSite=Lax y sin Secure.
-const COOKIE_SECURE = process.env.COOKIE_SECURE === '1';
+const COOKIE_SECURE = process.env.COOKIE_SECURE === '1' ||
+    (process.env.NODE_ENV === 'production' && process.env.COOKIE_SECURE !== '0');
 const COOKIE_SAMESITE = COOKIE_SECURE ? 'none' : 'lax';
 const COOKIE_OPTIONS_BASE = {
     httpOnly: true,
