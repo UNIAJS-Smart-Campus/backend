@@ -37,9 +37,12 @@ function obtenerPool() {
 }
 
 // Caché en memoria: sid -> { revocada, expiraMs }.
-// TTL corto (30 s): un logout se propaga en como máximo ese margen, y no
-// golpeamos la base de datos en cada petición.
-const TTL_CACHE_MS = Number(process.env.SESSIONES_CACHE_TTL_MS) || 30000;
+// TTL corto (5 s): un logout se propaga en como máximo ese margen, y no
+// golpeamos la base de datos en cada petición. Las entradas "no revocadas"
+// se caducan rápido para que la revocación sea casi inmediata; las
+// "revocadas" son estables, así que pueden cachearse algo más.
+const TTL_CACHE_MS = Number(process.env.SESSIONES_CACHE_TTL_MS) || 5000;
+const TTL_REVOCADO_MS = Number(process.env.SESSIONES_CACHE_TTL_REVOCADO_MS) || 60000;
 const cache = new Map();
 
 function ahora() {
@@ -76,7 +79,7 @@ async function estaRevocada(sid) {
         if (!filas.length) {
             // sid desconocido: tratar como revocado para no aceptar sesiones
             // huérfanas.
-            cache.set(sid, { revocada: true, expiraMs: t + TTL_CACHE_MS });
+            cache.set(sid, { revocada: true, expiraMs: t + TTL_REVOCADO_MS });
             return true;
         }
 
@@ -85,7 +88,8 @@ async function estaRevocada(sid) {
         const expirada = new Date(fila.expires_at) <= new Date();
         const resultado = revocada || expirada;
 
-        cache.set(sid, { revocada: resultado, expiraMs: t + TTL_CACHE_MS });
+        const ttl = resultado ? TTL_REVOCADO_MS : TTL_CACHE_MS;
+        cache.set(sid, { revocada: resultado, expiraMs: t + ttl });
         return resultado;
     } catch (error) {
         console.warn('[sesiones] no se pudo consultar la revocación:', error.message);
