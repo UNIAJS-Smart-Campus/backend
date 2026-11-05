@@ -1,6 +1,6 @@
 /**
  * Exige que el rol propagado por el gateway esté entre los permitidos.
- * Los ids son los del JWT: 1 Administrador, 3 Docente, 4 Administrativo.
+ * Los ids son los del JWT y corresponden al catálogo de la tabla roles.
  */
 function requireRoles(...roles) {
     const permitidos = roles.map(String);
