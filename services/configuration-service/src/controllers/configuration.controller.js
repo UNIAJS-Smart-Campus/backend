@@ -2,6 +2,83 @@ const pool = require('../config/database');
 
 const idActor = (actor) => Number(actor?.id);
 const esAdmin = (actor) => String(actor?.rol) === '1';
+const SECCION_PERMISOS_ROLES = 'permisos_roles';
+
+function exigirAdmin(req, res) {
+    if (!esAdmin(req.actor)) {
+        res.status(403).json({ error: 'Solo el administrador puede gestionar permisos por rol' });
+        return false;
+    }
+    return true;
+}
+
+function normalizarPermisosRoles(valor) {
+    if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return null;
+    const resultado = {};
+    for (const [rol, config] of Object.entries(valor)) {
+        if (!config || typeof config !== 'object' || Array.isArray(config)) continue;
+        resultado[rol] = {
+            permisos: Array.isArray(config.permisos)
+                ? [...new Set(config.permisos.filter((item) => typeof item === 'string'))]
+                : [],
+            acciones: Array.isArray(config.acciones)
+                ? [...new Set(config.acciones.filter((item) => typeof item === 'string'))]
+                : []
+        };
+    }
+    return resultado;
+}
+
+async function getRolePermissions(req, res, next) {
+    try {
+        const [rows] = await pool.query(
+            'SELECT valor FROM configuracion WHERE id_usuario IS NULL AND seccion = ? ORDER BY id_config DESC LIMIT 1',
+            [SECCION_PERMISOS_ROLES]
+        );
+        if (!rows.length) return res.json({ data: null });
+        let valor = rows[0].valor;
+        if (typeof valor === 'string') {
+            try {
+                valor = JSON.parse(valor);
+            } catch {
+                return res.status(500).json({ error: 'La configuración de permisos está dañada' });
+            }
+        }
+        res.json({ data: normalizarPermisosRoles(valor) });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function updateRolePermissions(req, res, next) {
+    try {
+        if (!exigirAdmin(req, res)) return;
+        const valor = normalizarPermisosRoles(req.body?.roles ?? req.body);
+        if (!valor || !Object.keys(valor).length) {
+            return res.status(400).json({ error: 'Debes enviar permisos válidos por rol' });
+        }
+
+        const serializado = JSON.stringify(valor);
+        const [existentes] = await pool.query(
+            'SELECT id_config FROM configuracion WHERE id_usuario IS NULL AND seccion = ? ORDER BY id_config DESC LIMIT 1',
+            [SECCION_PERMISOS_ROLES]
+        );
+        if (existentes.length) {
+            await pool.query(
+                'UPDATE configuracion SET valor = ? WHERE id_config = ?',
+                [serializado, existentes[0].id_config]
+            );
+        } else {
+            await pool.query(
+                'INSERT INTO configuracion (id_usuario, seccion, valor) VALUES (NULL, ?, ?)',
+                [SECCION_PERMISOS_ROLES, serializado]
+            );
+        }
+        res.json({ data: valor });
+    } catch (error) {
+        next(error);
+    }
+}
 
 async function getAll(req, res, next) {
     try {
@@ -113,4 +190,13 @@ async function remove(req, res, next) {
     }
 }
 
-module.exports = { getAll, getOne, getByUserAndSection, create, update, remove };
+module.exports = {
+    getAll,
+    getOne,
+    getByUserAndSection,
+    create,
+    update,
+    remove,
+    getRolePermissions,
+    updateRolePermissions
+};
