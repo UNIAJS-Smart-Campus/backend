@@ -1,12 +1,18 @@
 const pool = require('../config/database');
 const bcrypt = require('bcryptjs');
 
-const CAMPOS = 'id_usuario, identificacion, usuario, cedula, nombre, apellido, correo, telefono, id_rol, tipo_usuario, programa, cargo, campus, foto_perfil, estado';
+const CAMPOS = 'u.id_usuario, u.identificacion, u.usuario, u.cedula, u.nombre, u.apellido, u.correo, u.telefono, u.id_rol, r.nombre_rol, u.tipo_usuario, u.programa, u.cargo, u.campus, u.foto_perfil, u.estado';
 const SALT_ROUNDS = 10;
+
+const CONSULTA_USUARIO = `
+    SELECT ${CAMPOS}
+    FROM usuarios u
+    LEFT JOIN roles r ON r.id_rol = u.id_rol
+`;
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query(`SELECT ${CAMPOS} FROM usuarios`);
+        const [rows] = await pool.query(CONSULTA_USUARIO);
         res.json({ data: rows });
     } catch (error) {
         next(error);
@@ -16,7 +22,7 @@ async function getAll(req, res, next) {
 async function getOne(req, res, next) {
     try {
         const { id } = req.params;
-        const [rows] = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`, [id]);
+        const [rows] = await pool.query(`${CONSULTA_USUARIO} WHERE u.id_usuario = ?`, [id]);
         if (!rows.length) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
@@ -70,7 +76,7 @@ async function create(req, res, next) {
             ]
         );
 
-        const [newUser] = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`, [result.insertId]);
+        const [newUser] = await pool.query(`${CONSULTA_USUARIO} WHERE u.id_usuario = ?`, [result.insertId]);
         res.status(201).json({ data: newUser[0] });
     } catch (error) {
         next(error);
@@ -88,7 +94,7 @@ async function update(req, res, next) {
         // Se permite actualizar solo algunos campos (p. ej. la foto de perfil
         // desde Configuración). Lo que no llega se conserva de la fila actual.
         const [actual] = await pool.query(
-            `SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`,
+            `${CONSULTA_USUARIO} WHERE u.id_usuario = ?`,
             [id]
         );
         if (!actual.length) {
@@ -142,7 +148,7 @@ async function update(req, res, next) {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
 
-        const [updated] = await pool.query(`SELECT ${CAMPOS} FROM usuarios WHERE id_usuario = ?`, [id]);
+        const [updated] = await pool.query(`${CONSULTA_USUARIO} WHERE u.id_usuario = ?`, [id]);
         res.json({ data: updated[0] });
     } catch (error) {
         next(error);
@@ -165,4 +171,15 @@ async function remove(req, res, next) {
     }
 }
 
-module.exports = { getAll, getOne, create, update, remove };
+async function getRoles(req, res, next) {
+    try {
+        const [rows] = await pool.query(
+            'SELECT id_rol, nombre_rol, descripcion FROM roles ORDER BY id_rol'
+        );
+        res.json({ data: rows });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { getAll, getOne, create, update, remove, getRoles };
