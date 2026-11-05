@@ -598,35 +598,27 @@ async function me(req, res, next) {
 
 /**
  * GET /auth/accesos
- * Últimos inicios de sesión del usuario autenticado. Alimenta la sección
- * Configuración → Seguridad → "Sesiones y dispositivos" con datos reales
- * de la tabla `auditoria` (antes esa lista era fija en el frontend).
+ * Sesiones activas del usuario autenticado. Las sesiones revocadas o vencidas
+ * no se muestran aunque permanezcan en la base de datos.
  */
 async function accesos(req, res, next) {
     try {
         const [rows] = await pool.query(
-            `SELECT id_auditoria, detalle, fecha
-             FROM auditoria
-             WHERE id_usuario = ? AND accion = 'LOGIN'
-             ORDER BY fecha DESC, id_auditoria DESC
-             LIMIT 10`,
-            [req.user.id]
+            `SELECT id, sid, created_at, expires_at
+             FROM sesiones
+             WHERE id_usuario = ? AND sid = ? AND revocada = 0 AND expires_at > NOW()
+             LIMIT 1`,
+            [req.user.id, req.user.sid]
         );
 
-        const data = rows.map((fila) => {
-            let detalle = {};
-            try {
-                detalle = JSON.parse(fila.detalle || '{}');
-            } catch {
-                // Detalle antiguo en texto plano: se deja vacío.
-            }
-            return {
-                id: fila.id_auditoria,
-                dispositivo: detalle.dispositivo || 'Dispositivo desconocido',
-                ip: detalle.ip || '',
-                fecha: fila.fecha
-            };
-        });
+        const data = rows.map((fila) => ({
+            id: fila.id,
+            dispositivo: 'Sesión activa',
+            ip: '',
+            fecha: fila.created_at,
+            actual: fila.sid === req.user.sid,
+            expira: fila.expires_at
+        }));
 
         res.json({ data });
     } catch (error) {

@@ -43,6 +43,14 @@ docker compose up -d mysql db-init phpmyadmin
   - si no existe, recrea `uajs_smart_campus` e importa `uajs_smart_campus.sql`;
   - si ya existe, conserva los datos y termina.
 
+Las migraciones posteriores al dump se aplican manualmente sobre la base
+existente. Para habilitar la configuración normalizada de capacidades y
+programas por rol, selecciona la base con `USE uajs_smart_campus;` (sin la
+palabra `DATABASE`) y ejecuta el contenido de
+`database/migrations/005_role_permissions.sql` en TiDB antes de desplegar el
+`configuration-service`. `SOURCE` solo funciona desde el cliente MySQL/TiDB;
+en un editor SQL web hay que abrir o pegar el contenido del archivo.
+
 Para reimportar desde cero (elimina los datos actuales):
 
 ```bash

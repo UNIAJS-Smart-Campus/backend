@@ -37,20 +37,32 @@ function normalizarPermisosRoles(valor) {
 
 async function getRolePermissions(req, res, next) {
     try {
-        const [rows] = await pool.query(
-            'SELECT valor FROM configuracion WHERE id_usuario IS NULL AND seccion = ? ORDER BY id_config DESC LIMIT 1',
-            [SECCION_PERMISOS_ROLES]
+        const [roles] = await pool.query(
+            `SELECT r.id_rol, r.nombre_rol,
+                    c.tipo, c.clave,
+                    p.programa
+             FROM roles r
+             LEFT JOIN rol_capacidades c ON c.id_rol = r.id_rol
+             LEFT JOIN rol_programas p ON p.id_rol = r.id_rol
+             ORDER BY r.id_rol, c.tipo, c.clave, p.programa`
         );
-        if (!rows.length) return res.json({ data: null });
-        let valor = rows[0].valor;
-        if (typeof valor === 'string') {
-            try {
-                valor = JSON.parse(valor);
-            } catch {
-                return res.status(500).json({ error: 'La configuración de permisos está dañada' });
-            }
+        const resultado = {};
+        for (const fila of roles) {
+            const rol = resultado[fila.nombre_rol] ||= {
+                permisos: [],
+                acciones: [],
+                programas: []
+            };
+            if (fila.tipo === 'permiso' && fila.clave) rol.permisos.push(fila.clave);
+            if (fila.tipo === 'accion' && fila.clave) rol.acciones.push(fila.clave);
+            if (fila.programa) rol.programas.push(fila.programa);
         }
-        res.json({ data: normalizarPermisosRoles(valor) });
+        for (const rol of Object.values(resultado)) {
+            rol.permisos = [...new Set(rol.permisos)];
+            rol.acciones = [...new Set(rol.acciones)];
+            rol.programas = [...new Set(rol.programas)];
+        }
+        res.json({ data: Object.keys(resultado).length ? resultado : null });
     } catch (error) {
         next(error);
     }
@@ -64,21 +76,42 @@ async function updateRolePermissions(req, res, next) {
             return res.status(400).json({ error: 'Debes enviar permisos válidos por rol' });
         }
 
-        const serializado = JSON.stringify(valor);
-        const [existentes] = await pool.query(
-            'SELECT id_config FROM configuracion WHERE id_usuario IS NULL AND seccion = ? ORDER BY id_config DESC LIMIT 1',
-            [SECCION_PERMISOS_ROLES]
-        );
-        if (existentes.length) {
-            await pool.query(
-                'UPDATE configuracion SET valor = ? WHERE id_config = ?',
-                [serializado, existentes[0].id_config]
-            );
-        } else {
-            await pool.query(
-                'INSERT INTO configuracion (id_usuario, seccion, valor) VALUES (NULL, ?, ?)',
-                [SECCION_PERMISOS_ROLES, serializado]
-            );
+        const conexion = await pool.getConnection();
+        try {
+            await conexion.beginTransaction();
+            const [roles] = await conexion.query('SELECT id_rol, nombre_rol FROM roles');
+            const idPorNombre = new Map(roles.map((rol) => [rol.nombre_rol, rol.id_rol]));
+
+            for (const [nombre, config] of Object.entries(valor)) {
+                const idRol = idPorNombre.get(nombre);
+                if (!idRol) continue;
+
+                await conexion.query('DELETE FROM rol_capacidades WHERE id_rol = ?', [idRol]);
+                await conexion.query('DELETE FROM rol_programas WHERE id_rol = ?', [idRol]);
+
+                const capacidades = [
+                    ...config.permisos.map((clave) => [idRol, 'permiso', clave]),
+                    ...config.acciones.map((clave) => [idRol, 'accion', clave])
+                ];
+                if (capacidades.length) {
+                    await conexion.query(
+                        'INSERT INTO rol_capacidades (id_rol, tipo, clave) VALUES ?',
+                        [capacidades]
+                    );
+                }
+                if (config.programas.length) {
+                    await conexion.query(
+                        'INSERT INTO rol_programas (id_rol, programa) VALUES ?',
+                        [config.programas.map((programa) => [idRol, programa])]
+                    );
+                }
+            }
+            await conexion.commit();
+        } catch (error) {
+            await conexion.rollback();
+            throw error;
+        } finally {
+            conexion.release();
         }
         res.json({ data: valor });
     } catch (error) {
