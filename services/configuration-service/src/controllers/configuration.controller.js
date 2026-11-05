@@ -23,6 +23,12 @@ function normalizarPermisosRoles(valor) {
                 : [],
             acciones: Array.isArray(config.acciones)
                 ? [...new Set(config.acciones.filter((item) => typeof item === 'string'))]
+                : [],
+            programas: Array.isArray(config.programas)
+                ? [...new Set(config.programas
+                    .filter((item) => typeof item === 'string')
+                    .map((item) => item.trim())
+                    .filter(Boolean))]
                 : []
         };
     }
