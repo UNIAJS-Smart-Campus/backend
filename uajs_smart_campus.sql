@@ -392,7 +392,9 @@ INSERT INTO `roles` (`id_rol`, `nombre_rol`, `descripcion`, `created_at`) VALUES
 (1, 'Administrador', 'Acceso total al sistema', '2026-09-30 23:00:40'),
 (2, 'Estudiante', 'Comunidad estudiantil', '2026-09-30 23:00:40'),
 (3, 'Docente', 'Personal docente', '2026-09-30 23:00:40'),
-(4, 'Administrativo', 'Personal administrativo', '2026-09-30 23:00:40');
+(4, 'Administrativo', 'Personal administrativo', '2026-09-30 23:00:40'),
+(5, 'Coordinador', 'Coordina programas y procesos académicos', '2026-11-05 01:34:00'),
+(6, 'Egresado', 'Comunidad de graduados', '2026-11-05 01:34:00');
 
 -- --------------------------------------------------------
 

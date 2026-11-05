@@ -96,6 +96,19 @@ async function limpiarEsquema(conexion, database) {
     }
 }
 
+async function asegurarRolesAcademicos(conexion) {
+    await conexion.query(
+        `INSERT INTO roles (id_rol, nombre_rol, descripcion)
+         VALUES
+           (5, 'Coordinador', 'Coordina programas y procesos académicos'),
+           (6, 'Egresado', 'Comunidad de graduados')
+         ON DUPLICATE KEY UPDATE
+           nombre_rol = VALUES(nombre_rol),
+           descripcion = VALUES(descripcion)`
+    );
+    console.log('[db] Roles académicos verificados: Coordinador y Egresado.');
+}
+
 async function inicializarBaseDeDatos() {
     if (!dbOptions.host || !dbOptions.database) {
         console.warn('[db] DB_HOST/DB_NAME no definidos: se omite la semilla.');
@@ -163,6 +176,8 @@ async function inicializarBaseDeDatos() {
                     `[db] Base de datos ya inicializada ` +
                     `(${objetosActuales}/${objetosEsperados} objetos).`
                 );
+                await asegurarRolesAcademicos(conexion);
+                await conexion.end();
                 return;
             }
 
@@ -200,6 +215,7 @@ async function inicializarBaseDeDatos() {
                 `[db] Semilla importada correctamente ` +
                 `(${objetosFinales}/${objetosEsperados} objetos).`
             );
+            await asegurarRolesAcademicos(conexion);
             return;
         } catch (error) {
             console.warn(`[db] Intento ${intento}/${MAX_INTENTOS} falló: ${error.message}`);
