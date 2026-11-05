@@ -3,8 +3,28 @@ const { notificar } = require('../services/notifications.client');
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query('SELECT * FROM eventos_y_actividades');
-        res.json({ data: rows });
+        const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+        if (!hasPagination) {
+            const [rows] = await pool.query('SELECT * FROM eventos_y_actividades');
+            return res.json({ data: rows });
+        }
+
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+        const offset = (page - 1) * limit;
+        const [[{ total }]] = await pool.query(
+            'SELECT COUNT(*) AS total FROM eventos_y_actividades'
+        );
+        const [rows] = await pool.query(
+            'SELECT * FROM eventos_y_actividades ORDER BY fecha ASC, id_evento ASC LIMIT ? OFFSET ?',
+            [limit, offset]
+        );
+        return res.json({
+            data: {
+                items: rows,
+                pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) }
+            }
+        });
     } catch (error) {
         next(error);
     }

@@ -30,10 +30,25 @@ async function getHistorial(idSolicitud) {
 async function getAll(req, res, next) {
     try {
         const actor = req.actor;
-        const [rows] = await pool.query(
-            esGestor(actor) ? SELECT_SOLICITUD : `${SELECT_SOLICITUD} WHERE s.id_usuario = ?`,
-            esGestor(actor) ? [] : [idActor(actor)]
-        );
+        const filtro = esGestor(actor) ? '' : ' WHERE s.id_usuario = ?';
+        const params = esGestor(actor) ? [] : [idActor(actor)];
+        const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+        const offset = (page - 1) * limit;
+        const query = hasPagination
+            ? `${SELECT_SOLICITUD}${filtro} ORDER BY s.fecha_solicitud DESC, s.id_solicitud DESC LIMIT ? OFFSET ?`
+            : `${SELECT_SOLICITUD}${filtro}`;
+        const [rows] = await pool.query(query, hasPagination ? [...params, limit, offset] : params);
+
+        let total = null;
+        if (hasPagination) {
+            const [[count]] = await pool.query(
+                `SELECT COUNT(*) AS total FROM solicitudes s${filtro}`,
+                params
+            );
+            total = Number(count.total);
+        }
 
         // El historial viaja anidado para no disparar una consulta por solicitud.
         // Solo se consultan las solicitudes visibles para este actor.
@@ -64,6 +79,14 @@ async function getAll(req, res, next) {
             historial: porSolicitud.get(row.id_solicitud) || []
         }));
 
+        if (hasPagination) {
+            return res.json({
+                data: {
+                    items: data,
+                    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+                }
+            });
+        }
         res.json({ data });
     } catch (error) {
         next(error);

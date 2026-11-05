@@ -9,7 +9,8 @@ async function getAll(req, res, next) {
         const actor = req.actor;
         const filtro = esGestor(actor) ? '' : ' WHERE r.id_usuario = ?';
         const params = esGestor(actor) ? [] : [idActor(actor)];
-        const [rows] = await pool.query(`
+        const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+        const baseQuery = `
             SELECT r.*,
                    u.nombre AS usuario_nombre,
                    u.apellido AS usuario_apellido,
@@ -18,9 +19,29 @@ async function getAll(req, res, next) {
             FROM reservas r
             LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
             LEFT JOIN recursos rec ON r.id_recurso = rec.id_recurso
-            ${filtro}
-        `, params);
-        res.json({ data: rows });
+            ${filtro}`;
+        if (!hasPagination) {
+            const [rows] = await pool.query(baseQuery, params);
+            return res.json({ data: rows });
+        }
+
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+        const offset = (page - 1) * limit;
+        const [[{ total }]] = await pool.query(
+            `SELECT COUNT(*) AS total FROM reservas r${filtro}`,
+            params
+        );
+        const [rows] = await pool.query(
+            `${baseQuery} ORDER BY r.fecha_reserva DESC, r.id_reserva DESC LIMIT ? OFFSET ?`,
+            [...params, limit, offset]
+        );
+        return res.json({
+            data: {
+                items: rows,
+                pagination: { page, limit, total: Number(total), totalPages: Math.ceil(Number(total) / limit) }
+            }
+        });
     } catch (error) {
         next(error);
     }
