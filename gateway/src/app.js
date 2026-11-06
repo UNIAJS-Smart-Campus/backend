@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
+const http = require('http');
 const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
@@ -35,6 +37,14 @@ app.use(helmet({
 	xFrameOptions: { action: 'deny' },
 	contentSecurityPolicy: false
 }));
+
+// Compresión gzip de las respuestas JSON. Sin esto, cada lista que sale del
+// gateway viaja sin comprimir a Vercel y a los móviles (un listado de
+// notificaciones o usuarios puede ser 4-5 veces más pesado). Se coloca antes
+// del proxy para que también cubra las respuestas reenviadas desde los
+// microservicios; el filtro por defecto solo comprime tipos comprimibles
+// (JSON, texto) y respeta un mínimo de 1 KB.
+app.use(compression());
 
 // CORS restringido: solo los orígenes configurados (coma-separados).
 // En producción hay que definir CORS_ORIGINS con el dominio del frontend.
@@ -71,9 +81,20 @@ app.get('/', (req, res) => {
 	});
 });
 
+// Agente HTTP con keep-alive para TODAS las llamadas internas al proxy.
+// Por defecto http-proxy pone `agent: false`, que crea un socket nuevo para
+// cada petición (saludo TCP + TLS completo contra el microservicio de destino).
+// Con keep-alive los sockets se reutilizan: baja la latencia de cada
+// request autenticada (auth-service se consulta en casi todas) y el costo de
+// abrir/cerrar conexiones en Render, que es un plan con CPU limitada.
+// Un solo agente para todos los servicios: las claves de socket se guardan
+// por host:puerto, así que cada destino mantiene su propio grupo de sockets.
+const agenteInterno = new http.Agent({ keepAlive: true, maxSockets: 100 });
+
 const proxyFor = (service, prefix) => createProxyMiddleware({
 	target: routes[service],
 	changeOrigin: true,
+	agent: agenteInterno,
 	pathRewrite: (path) => `${prefix}${path}`,
 	// El token ya fue validado aquí; se reenvían sus claims para que cada
 	// microservicio sepa quién es el usuario sin volver a verificar el JWT.

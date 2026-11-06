@@ -2,7 +2,12 @@ const pool = require('../config/database');
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query('SELECT * FROM recursos');
+        // Catálogo pequeño (decenas de filas), pero con tope defensivo
+        // (500 por defecto, ?limit=, tope 1000). Sin ORDER BY a propósito:
+        // mientras no se supere el tope, el orden natural es el mismo de
+        // siempre y la página no cambia.
+        const limite = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 500));
+        const [rows] = await pool.query('SELECT * FROM recursos LIMIT ?', [limite]);
         res.json({ data: rows });
     } catch (error) {
         next(error);

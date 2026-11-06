@@ -22,9 +22,13 @@ async function emitirCambio(idUsuario, evento, notificacion) {
 async function getAll(req, res, next) {
     try {
         // El buzón es personal: siempre se filtra por el actor del JWT.
+        // Con tope de 500 (más recientes primero, ?limit=, tope 1000) para que
+        // una cuenta con años de notificaciones no dispare una respuesta
+        // enorme; "marcar todas" del frontend lee esta misma lista.
+        const limite = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 500));
         const [rows] = await pool.query(
-            'SELECT * FROM notificaciones WHERE id_usuario = ? ORDER BY fecha_envio DESC',
-            [idActor(req.actor)]
+            'SELECT * FROM notificaciones WHERE id_usuario = ? ORDER BY fecha_envio DESC LIMIT ?',
+            [idActor(req.actor), limite]
         );
         res.json({ data: rows });
     } catch (error) {

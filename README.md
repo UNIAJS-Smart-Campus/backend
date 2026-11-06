@@ -103,6 +103,15 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 
 Solo Caddy publica 80/443; MySQL y Elasticsearch quedan en la red interna.
 
+## Rendimiento
+
+- El gateway comprime respuestas con `compression` y reutiliza sockets hacia
+  los microservicios (keep-alive) — ver `docs/DESPLIEGUE-RENDER-TIDB.md`.
+- Las listas sin paginar (`usuarios`, `pqrs`, `notificaciones`, `recursos`)
+  aceptan `?limit=` (500 por defecto, 1000 máximo).
+- En producción define `DB_CONN_LIMIT` (p. ej. `3`): sin ella cada uno de los
+  11 servicios abre hasta 10 conexiones con la base.
+
 ## Autores y colaboradores
 
 - [ValeriaOsp](https://github.com/ValeriaOsp)

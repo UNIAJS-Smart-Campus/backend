@@ -12,7 +12,17 @@ const CONSULTA_USUARIO = `
 
 async function getAll(req, res, next) {
     try {
-        const [rows] = await pool.query(CONSULTA_USUARIO);
+        // La tabla de usuarios crece con cada cuenta del campus y el frontend
+        // paginará en el cliente. Se limita la respuesta (500 por defecto,
+        // ?limit= para ajustar, tope 1000) para que una consulta maliciosa o un
+        // crecimiento inesperado no devuelvan megabytes. Se ordena de más
+        // reciente a antiguo para que el tope nunca oculte a un usuario recién
+        // creado (el orden natural sería el contrario).
+        const limite = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 500));
+        const [rows] = await pool.query(
+            `${CONSULTA_USUARIO} ORDER BY u.id_usuario DESC LIMIT ?`,
+            [limite]
+        );
         res.json({ data: rows });
     } catch (error) {
         next(error);

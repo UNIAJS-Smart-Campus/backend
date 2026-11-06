@@ -17,9 +17,15 @@ const CAMPOS = [
 async function getAll(req, res, next) {
     try {
         const actor = req.actor;
+        // La bandeja de PQRS es una cola: se entrega de más reciente a
+        // antiguo y con tope (500 por defecto, ?limit=, tope 1000) para que
+        // la respuesta no crezca sin control a medida que entran tickets.
+        const limite = Math.min(1000, Math.max(1, Number.parseInt(req.query.limit, 10) || 500));
         const [rows] = await pool.query(
-            esGestor(actor) ? 'SELECT * FROM pqrs' : 'SELECT * FROM pqrs WHERE id_usuario = ?',
-            esGestor(actor) ? [] : [idActor(actor)]
+            esGestor(actor)
+                ? 'SELECT * FROM pqrs ORDER BY id_pqrs DESC LIMIT ?'
+                : 'SELECT * FROM pqrs WHERE id_usuario = ? ORDER BY id_pqrs DESC LIMIT ?',
+            esGestor(actor) ? [limite] : [idActor(actor), limite]
         );
         res.json({ data: rows });
     } catch (error) {

@@ -56,6 +56,31 @@ eso el backend usa el modo *all-in-one*:
 
 Render inyecta `PORT` (10000) y el health check usa el gateway.
 
+#### `DB_CONN_LIMIT`: por qué hay que definirlo
+
+Cada servicio crea su propia pool de conexiones con
+`connectionLimit: Number(process.env.DB_CONN_LIMIT) || 10`. En `ALL_IN_ONE`
+corren 11 servicios en el mismo proceso, así que **sin la variable el techo
+es ~110 conexiones abiertas** (más la pool de auditoría del gateway, limitada
+a 2) y con `DB_CONN_LIMIT=3` baja a ~35. El plan free de TiDB tiene pocos
+recursos, así que el valor debe estar definido en Render → Environment;
+si no está, manda el defecto de `10` por servicio.
+
+### Rendimiento de las respuestas
+
+- **Compresión gzip en el gateway** (`compression`): todo JSON que sale del
+  gateway llega comprimido a Vercel y a los móviles (un listado suele pesar
+  4-5 veces menos). Está montada antes del proxy, así que también cubre las
+  respuestas reenviadas desde los microservicios.
+- **Keep-alive en el proxy interno**: el gateway reutiliza los sockets HTTP
+  hacia los microservicios (`http.Agent` con `keepAlive`) en lugar de abrir
+  uno nuevo por petición; importa sobre todo en Render, donde abrir y cerrar
+  conexiones cuesta CPU.
+- **Tope en las listas sin paginar** (`usuarios`, `pqrs`, `notificaciones`,
+  `recursos`): aceptan `?limit=` (500 por defecto, 1000 máximo) y entregan lo
+  más reciente primero, para que la respuesta no crezca sin control.
+  `solicitudes`, `eventos` y `reservas` ya usan paginación `page`/`limit`.
+
 ### Base de datos: semilla automática
 
 `start-all.js` importa `uajs_smart_campus.sql` en el arranque, pero **no lo
