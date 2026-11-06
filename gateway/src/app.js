@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
@@ -17,6 +18,23 @@ const app = express();
 // X-Forwarded-For. Sin esto, el rate limit contaría a todos como la misma IP.
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+
+// Cabeceras de seguridad en TODA respuesta del API (antes solo las ponía
+// Vercel en el frontend). X-Frame-Options/HSTS/nosniff etc. ya no dependen
+// de que el cliente los aplique.
+// - crossOriginResourcePolicy 'cross-origin': el frontend (Vercel) consume
+//   este API desde otro origen; el valor por defecto de helmet ('same-origin')
+//   bloquearía esas respuestas.
+// - contentSecurityPolicy off: el gateway solo devuelve JSON; la CSP útil es
+//   la del frontend, que se define en vercel.json.
+app.use(helmet({
+	crossOriginResourcePolicy: { policy: 'cross-origin' },
+	// El gateway solo devuelve JSON: nadie debe incrustar estas respuestas.
+	// En el frontend la regla ya es DENY (vercel.json).
+	// Nota: en helmet 8 la opción se llama xFrameOptions (frameOptions se ignora).
+	xFrameOptions: { action: 'deny' },
+	contentSecurityPolicy: false
+}));
 
 // CORS restringido: solo los orígenes configurados (coma-separados).
 // En producción hay que definir CORS_ORIGINS con el dominio del frontend.
@@ -158,6 +176,25 @@ const restablecerLimiter = rateLimit({
 
 app.use('/api/auth/restablecer', (req, res, next) =>
 	req.method === 'POST' ? restablecerLimiter(req, res, next) : next()
+);
+
+// Renovación de sesión: el refresh token es opaco y de 32 bytes, así que la
+// fuerza bruta es inviable, pero el endpoint es público y se llama en cada
+// caducidad del access token. 30/min por IP (solo se cuentan los fallos)
+// evita usarlo como punto de entrada para bombardeo o robo de cupo.
+const refreshLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	limit: 30,
+	standardHeaders: true,
+	legacyHeaders: false,
+	skipSuccessfulRequests: true,
+	message: {
+		error: 'Demasiadas renovaciones de sesión. Vuelve a intentarlo en un minuto.'
+	}
+});
+
+app.use('/api/auth/refresh', (req, res, next) =>
+	req.method === 'POST' ? refreshLimiter(req, res, next) : next()
 );
 
 // Límite general de la API: protege contra ráfagas y scraping.
