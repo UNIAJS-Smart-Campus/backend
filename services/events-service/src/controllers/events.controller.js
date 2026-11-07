@@ -96,7 +96,8 @@ async function listarInscripciones(req, res, next) {
         const { id } = req.params;
         const [rows] = await pool.query(
             `SELECT i.id_inscripcion, i.id_usuario, i.fecha_inscripcion,
-                     u.nombre, u.apellido, u.programa, u.correo, u.identificacion
+                     u.nombre, u.apellido, u.programa, u.correo, 
+                     u.identificacion, u.cedula
               FROM inscripciones_eventos i
               LEFT JOIN usuarios u ON i.id_usuario = u.id_usuario
               WHERE i.id_evento = ?
